@@ -1,0 +1,18 @@
+# CI placeholder — workflows will be added when the first tests are written.
+# See: https://github.com/OpenSpectrum/openspectrum-docs/issues for tracking.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: CI not yet configured
+        run: echo "Add test and lint steps here once the project has a test suite."
