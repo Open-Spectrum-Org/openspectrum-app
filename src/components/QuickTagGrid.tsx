@@ -7,16 +7,16 @@ import type { TagWithCategory } from '../types/database';
 
 interface QuickTagGridProps {
   groups: GroupedTags[];
-  onTagPress: (tag: TagWithCategory) => void;
+  onTagPress: (tag: TagWithCategory, position: { x: number; y: number }) => void;
 }
 
-// Show these 4 categories on the Quick Capture screen
+// Show these 4 categories on the Quick Capture screen (order determines display order)
 const QUICK_CAPTURE_CATEGORIES = ['behavior', 'food', 'medication', 'emotion'];
 
 export function QuickTagGrid({ groups, onTagPress }: QuickTagGridProps) {
-  const filteredGroups = groups.filter((g) =>
-    QUICK_CAPTURE_CATEGORIES.includes(g.category)
-  );
+  const filteredGroups = groups
+    .filter((g) => QUICK_CAPTURE_CATEGORIES.includes(g.category))
+    .sort((a, b) => QUICK_CAPTURE_CATEGORIES.indexOf(a.category) - QUICK_CAPTURE_CATEGORIES.indexOf(b.category));
 
   return (
     <View style={styles.container}>

@@ -8,10 +8,10 @@ interface DaySummaryRowProps {
 }
 
 const badges = [
-  { key: 'sleep' as const, label: 'Sleep', emoji: '😴', color: colors.sleep },
-  { key: 'meals' as const, label: 'Meals', emoji: '🍽️', color: colors.food },
-  { key: 'meds' as const, label: 'Meds', emoji: '💊', color: colors.medication },
-  { key: 'incidents' as const, label: 'Incidents', emoji: '⚡', color: colors.behavior },
+  { key: 'behavior' as const, label: 'Behavior', emoji: '⚡', color: colors.behavior },
+  { key: 'emotion' as const, label: 'Emotion', emoji: '😊', color: colors.emotion },
+  { key: 'food' as const, label: 'Food', emoji: '🍽️', color: colors.food },
+  { key: 'medication' as const, label: 'Medication', emoji: '💊', color: colors.medication },
 ];
 
 export function DaySummaryRow({ summary }: DaySummaryRowProps) {

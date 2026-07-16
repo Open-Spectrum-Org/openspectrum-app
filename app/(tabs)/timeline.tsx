@@ -28,13 +28,13 @@ export default function TimelineScreen() {
     }, [refresh])
   );
 
-  const handleDelete = async (id: string) => {
-    const deletedId = await deleteObservation(id);
+  const handleDelete = useCallback(async (id: string) => {
+    await deleteObservation(id);
     showToast('Entry deleted', {
       duration: 5000,
-      undoAction: () => undoDelete(deletedId),
+      undoAction: () => undoDelete(id),
     });
-  };
+  }, [deleteObservation, showToast, undoDelete]);
 
   const renderItem = useCallback(
     ({ item }: { item: ObservationWithTags }) => (
@@ -62,7 +62,7 @@ export default function TimelineScreen() {
           onPress={() => router.push('/(tabs)')}
           style={styles.logButton}
         >
-          <Text style={styles.logButtonText}>+ Log Something</Text>
+          <Text style={styles.logButtonText}>Log an Event</Text>
         </Pressable>
       </View>
     </>

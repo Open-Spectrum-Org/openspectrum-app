@@ -7,13 +7,18 @@ interface ToastProps {
   visible: boolean;
   undoAction?: () => void;
   onHide: () => void;
+  position?: { x: number; y: number };
 }
 
-export function Toast({ message, visible, undoAction, onHide }: ToastProps) {
+export function Toast({ message, visible, undoAction, onHide, position }: ToastProps) {
   if (!visible) return null;
 
+  const containerStyle = position
+    ? [styles.container, { top: Math.max(position.y - 80, 60), bottom: undefined }]
+    : [styles.container];
+
   return (
-    <View style={styles.container}>
+    <View style={containerStyle}>
       <View style={styles.toast}>
         <Text style={styles.message}>{message}</Text>
         {undoAction && (

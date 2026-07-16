@@ -6,7 +6,7 @@ import type { TagWithCategory } from '../types/database';
 
 interface QuickTagButtonProps {
   tag: TagWithCategory;
-  onPress: (tag: TagWithCategory) => void;
+  onPress: (tag: TagWithCategory, position: { x: number; y: number }) => void;
 }
 
 export function QuickTagButton({ tag, onPress }: QuickTagButtonProps) {
@@ -15,7 +15,7 @@ export function QuickTagButton({ tag, onPress }: QuickTagButtonProps) {
 
   return (
     <Pressable
-      onPress={() => onPress(tag)}
+      onPress={(event) => onPress(tag, { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY })}
       style={({ pressed }) => [
         styles.button,
         { backgroundColor: bgColor, borderColor },
@@ -39,7 +39,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     justifyContent: 'center',
     alignItems: 'center',
-    flex: 1,
+    flexBasis: '45%',
+    flexGrow: 1,
     margin: spacing.xs,
   },
   pressed: {

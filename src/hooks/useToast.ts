@@ -5,6 +5,7 @@ interface ToastState {
   visible: boolean;
   undoAction?: () => void;
   duration: number;
+  position?: { x: number; y: number };
 }
 
 export function useToast() {
@@ -15,11 +16,11 @@ export function useToast() {
   });
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const showToast = useCallback((message: string, options?: { duration?: number; undoAction?: () => void }) => {
+  const showToast = useCallback((message: string, options?: { duration?: number; undoAction?: () => void; position?: { x: number; y: number } }) => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
     const duration = options?.duration ?? 2000;
-    setToast({ message, visible: true, undoAction: options?.undoAction, duration });
+    setToast({ message, visible: true, undoAction: options?.undoAction, duration, position: options?.position });
 
     timeoutRef.current = setTimeout(() => {
       setToast((prev) => ({ ...prev, visible: false }));

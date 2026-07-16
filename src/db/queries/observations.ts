@@ -84,25 +84,25 @@ export async function getDaySummary(
   const endOfDay = `${date}T23:59:59.999Z`;
 
   const counts = await db.getFirstAsync<{
-    sleep: number;
-    meals: number;
-    meds: number;
-    incidents: number;
+    behavior: number;
+    emotion: number;
+    food: number;
+    medication: number;
   }>(
     `SELECT
-       SUM(CASE WHEN category = 'sleep' THEN 1 ELSE 0 END) as sleep,
-       SUM(CASE WHEN category = 'food' THEN 1 ELSE 0 END) as meals,
-       SUM(CASE WHEN category = 'medication' THEN 1 ELSE 0 END) as meds,
-       SUM(CASE WHEN entry_type = 'incident' OR category = 'behavior' THEN 1 ELSE 0 END) as incidents
+       SUM(CASE WHEN category = 'behavior' THEN 1 ELSE 0 END) as behavior,
+       SUM(CASE WHEN category = 'emotion' THEN 1 ELSE 0 END) as emotion,
+       SUM(CASE WHEN category = 'food' THEN 1 ELSE 0 END) as food,
+       SUM(CASE WHEN category = 'medication' THEN 1 ELSE 0 END) as medication
      FROM observations
      WHERE child_id = ? AND occurred_at >= ? AND occurred_at <= ? AND is_deleted = 0`,
     [childId, startOfDay, endOfDay]
   );
 
   return {
-    sleep: counts?.sleep ?? 0,
-    meals: counts?.meals ?? 0,
-    meds: counts?.meds ?? 0,
-    incidents: counts?.incidents ?? 0,
+    behavior: counts?.behavior ?? 0,
+    emotion: counts?.emotion ?? 0,
+    food: counts?.food ?? 0,
+    medication: counts?.medication ?? 0,
   };
 }

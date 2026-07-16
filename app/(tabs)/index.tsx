@@ -21,10 +21,10 @@ export default function QuickCaptureScreen() {
   const { groupedTags } = useTags();
   const { toast, showToast, hideToast } = useToast();
 
-  const handleTagPress = async (tag: TagWithCategory) => {
+  const handleTagPress = async (tag: TagWithCategory, position: { x: number; y: number }) => {
     if (!child) return;
     await insertQuickTapObservation(db, child.id, TEST_USER_ID, tag);
-    showToast(`${tag.name} logged`);
+    showToast(`${tag.name} logged`, { position });
   };
 
   const handleMicPress = () => {
@@ -49,6 +49,7 @@ export default function QuickCaptureScreen() {
         message={toast.message}
         visible={toast.visible}
         onHide={hideToast}
+        position={toast.position}
       />
     </SafeAreaView>
   );

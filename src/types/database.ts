@@ -135,8 +135,8 @@ export interface ObservationWithTags extends Observation {
 }
 
 export interface DaySummary {
-  sleep: number;
-  meals: number;
-  meds: number;
-  incidents: number;
+  behavior: number;
+  emotion: number;
+  food: number;
+  medication: number;
 }

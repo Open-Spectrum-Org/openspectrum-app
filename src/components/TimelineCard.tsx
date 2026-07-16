@@ -15,17 +15,23 @@ export function TimelineCard({ observation, onDelete }: TimelineCardProps) {
   const tagNames = observation.tags.map((t) => t.name).join(', ');
 
   return (
-    <Pressable
-      onLongPress={() => onDelete(observation.id)}
-      style={styles.card}
-    >
+    <View style={styles.card}>
       <View style={[styles.colorBar, { backgroundColor: barColor }]} />
       <View style={styles.content}>
         <View style={styles.header}>
           <Text style={styles.time}>{formatTime(observation.occurred_at)}</Text>
-          <Text style={[styles.category, { color: barColor }]}>
-            {observation.category}
-          </Text>
+          <View style={styles.headerRight}>
+            <Text style={[styles.category, { color: barColor }]}>
+              {observation.category}
+            </Text>
+            <Pressable
+              onPress={() => onDelete(observation.id)}
+              style={styles.deleteButton}
+              hitSlop={8}
+            >
+              <Text style={styles.deleteIcon}>✕</Text>
+            </Pressable>
+          </View>
         </View>
         <Text style={styles.title}>{observation.title ?? tagNames}</Text>
         {observation.notes ? (
@@ -35,7 +41,7 @@ export function TimelineCard({ observation, onDelete }: TimelineCardProps) {
           <Text style={styles.tags}>{tagNames}</Text>
         ) : null}
       </View>
-    </Pressable>
+    </View>
   );
 }
 
@@ -65,6 +71,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  deleteButton: {
+    padding: spacing.xs,
+  },
+  deleteIcon: {
+    fontSize: 12,
+    color: colors.textMuted,
   },
   time: {
     ...typography.caption,
