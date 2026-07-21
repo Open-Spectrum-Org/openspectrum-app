@@ -6,11 +6,14 @@ import { MicButton } from '../../src/components/MicButton';
 import { QuickTagGrid } from '../../src/components/QuickTagGrid';
 import { StressFAB } from '../../src/components/StressFAB';
 import { Toast } from '../../src/components/Toast';
+import { VoiceReviewSheet } from '../../src/components/VoiceReviewSheet';
 import { useDatabase } from '../../src/hooks/useDatabase';
 import { useChild } from '../../src/hooks/useChild';
 import { useTags } from '../../src/hooks/useTags';
 import { useToast } from '../../src/hooks/useToast';
+import { useVoiceCapture } from '../../src/hooks/useVoiceCapture';
 import { insertQuickTapObservation } from '../../src/db/queries/observations';
+import { saveVoiceLogWithObservations } from '../../src/db/queries/voiceLogs';
 import { TEST_USER_ID } from '../../src/db/seed';
 import { colors } from '../../src/theme';
 import type { TagWithCategory } from '../../src/types/database';
@@ -20,6 +23,7 @@ export default function QuickCaptureScreen() {
   const { child } = useChild();
   const { groupedTags } = useTags();
   const { toast, showToast, hideToast } = useToast();
+  const voice = useVoiceCapture();
 
   const handleTagPress = async (tag: TagWithCategory, position: { x: number; y: number }) => {
     if (!child) return;
@@ -27,8 +31,25 @@ export default function QuickCaptureScreen() {
     showToast(`${tag.name} logged`, { position });
   };
 
-  const handleMicPress = () => {
-    showToast('Voice capture coming soon');
+  const handleVoiceConfirm = async () => {
+    if (!child || !voice.parsedResult) return;
+    const confirmed = voice.parsedResult.suggestedObservations.filter((o) => o.confirmed);
+    if (confirmed.length === 0) return;
+
+    try {
+      await saveVoiceLogWithObservations(
+        db,
+        child.id,
+        TEST_USER_ID,
+        voice.editedTranscript || voice.transcript,
+        voice.durationSeconds,
+        confirmed
+      );
+      showToast(`${confirmed.length} observation${confirmed.length > 1 ? 's' : ''} logged`);
+      voice.reset();
+    } catch {
+      showToast('Failed to save voice log');
+    }
   };
 
   return (
@@ -40,11 +61,29 @@ export default function QuickCaptureScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <MicButton onPress={handleMicPress} />
+          <MicButton
+            onPressIn={voice.startRecording}
+            onPressOut={voice.stopRecording}
+            state={voice.state}
+            durationSeconds={voice.durationSeconds}
+          />
           <QuickTagGrid groups={groupedTags} onTagPress={handleTagPress} />
         </ScrollView>
         <StressFAB />
       </View>
+      <VoiceReviewSheet
+        visible={voice.state === 'review' || voice.state === 'analyzing'}
+        transcript={voice.editedTranscript}
+        parsedResult={voice.parsedResult}
+        error={voice.error}
+        isAnalyzing={voice.state === 'analyzing'}
+        onChangeTranscript={voice.setEditedTranscript}
+        onReanalyze={voice.submitForAnalysis}
+        onToggleObservation={voice.toggleObservation}
+        onRemoveObservation={voice.removeObservation}
+        onConfirm={handleVoiceConfirm}
+        onDiscard={voice.reset}
+      />
       <Toast
         message={toast.message}
         visible={toast.visible}
