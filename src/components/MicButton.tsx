@@ -11,8 +11,7 @@ import { colors, spacing, typography } from '../theme';
 import type { VoiceRecordingState } from '../types/voice';
 
 interface MicButtonProps {
-  onPressIn: () => void;
-  onPressOut: () => void;
+  onPress: () => void;
   state: VoiceRecordingState;
   durationSeconds: number;
 }
@@ -23,7 +22,7 @@ function formatDuration(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export function MicButton({ onPressIn, onPressOut, state, durationSeconds }: MicButtonProps) {
+export function MicButton({ onPress, state, durationSeconds }: MicButtonProps) {
   const pulse = useSharedValue(1);
 
   useEffect(() => {
@@ -43,21 +42,21 @@ export function MicButton({ onPressIn, onPressOut, state, durationSeconds }: Mic
   const isProcessing = state === 'transcribing' || state === 'analyzing' || state === 'saving';
 
   const label = isRecording
-    ? 'Release to Stop'
+    ? 'Tap to Stop'
     : isProcessing
       ? state === 'analyzing' ? 'Analyzing...' : 'Processing...'
-      : 'Hold to Speak';
+      : 'Tap to Speak';
 
   return (
     <View style={styles.container}>
       <Animated.View style={animatedStyle}>
         <Pressable
-          onPressIn={isProcessing ? undefined : onPressIn}
-          onPressOut={isProcessing ? undefined : onPressOut}
-          style={[
+          onPress={isProcessing ? undefined : onPress}
+          style={({ pressed }) => [
             styles.button,
             isRecording && styles.recording,
             isProcessing && styles.processing,
+            !isProcessing && pressed && styles.pressed,
           ]}
           disabled={isProcessing}
         >
@@ -99,6 +98,10 @@ const styles = StyleSheet.create({
   processing: {
     backgroundColor: colors.primary,
     borderColor: colors.primary,
+  },
+  pressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.95 }],
   },
   icon: {
     fontSize: 48,

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { categoryColor } from '../theme/colors';
 import { colors, spacing, typography, radius } from '../theme';
@@ -13,6 +13,8 @@ interface TimelineCardProps {
 export function TimelineCard({ observation, onDelete }: TimelineCardProps) {
   const barColor = categoryColor(observation.category);
   const tagNames = observation.tags.map((t) => t.name).join(', ');
+  const isVoice = observation.entry_type === 'voice' && observation.notes;
+  const [showSummary, setShowSummary] = useState(false);
 
   return (
     <View style={styles.card}>
@@ -33,10 +35,22 @@ export function TimelineCard({ observation, onDelete }: TimelineCardProps) {
             </Pressable>
           </View>
         </View>
-        <Text style={styles.title}>{observation.title ?? tagNames}</Text>
-        {observation.notes ? (
-          <Text style={styles.notes} numberOfLines={2}>{observation.notes}</Text>
-        ) : null}
+        <Text style={styles.title}>
+          {showSummary ? observation.notes : (observation.title ?? tagNames)}
+        </Text>
+        {isVoice ? (
+          <Pressable onPress={() => setShowSummary((v) => !v)} style={styles.toggleBtn}>
+            <Text style={styles.toggleText}>
+              {showSummary ? 'Show transcript' : 'Show AI summary'}
+            </Text>
+          </Pressable>
+        ) : (
+          <>
+            {observation.notes ? (
+              <Text style={styles.notes} numberOfLines={2}>{observation.notes}</Text>
+            ) : null}
+          </>
+        )}
         {tagNames && observation.title ? (
           <Text style={styles.tags}>{tagNames}</Text>
         ) : null}
@@ -105,5 +119,14 @@ const styles = StyleSheet.create({
   tags: {
     ...typography.caption,
     color: colors.textMuted,
+  },
+  toggleBtn: {
+    alignSelf: 'flex-start',
+    paddingVertical: 2,
+  },
+  toggleText: {
+    ...typography.caption,
+    color: colors.primary,
+    fontWeight: '500',
   },
 });

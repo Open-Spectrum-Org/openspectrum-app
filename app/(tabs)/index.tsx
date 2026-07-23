@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppHeader } from '../../src/components/AppHeader';
 import { ChildSelector } from '../../src/components/ChildSelector';
 import { MicButton } from '../../src/components/MicButton';
 import { QuickTagGrid } from '../../src/components/QuickTagGrid';
@@ -19,6 +20,7 @@ import { colors } from '../../src/theme';
 import type { TagWithCategory } from '../../src/types/database';
 
 export default function QuickCaptureScreen() {
+  const [searchQuery, setSearchQuery] = useState('');
   const db = useDatabase();
   const { child } = useChild();
   const { groupedTags } = useTags();
@@ -42,6 +44,7 @@ export default function QuickCaptureScreen() {
         child.id,
         TEST_USER_ID,
         voice.editedTranscript || voice.transcript,
+        voice.parsedResult.summary,
         voice.durationSeconds,
         confirmed
       );
@@ -55,6 +58,12 @@ export default function QuickCaptureScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.content}>
+        <AppHeader
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          placeholder="Filter tags..."
+          showHome={false}
+        />
         <ChildSelector />
         <ScrollView
           style={styles.scroll}
@@ -62,12 +71,11 @@ export default function QuickCaptureScreen() {
           showsVerticalScrollIndicator={false}
         >
           <MicButton
-            onPressIn={voice.startRecording}
-            onPressOut={voice.stopRecording}
+            onPress={voice.state === 'recording' ? voice.stopRecording : voice.startRecording}
             state={voice.state}
             durationSeconds={voice.durationSeconds}
           />
-          <QuickTagGrid groups={groupedTags} onTagPress={handleTagPress} />
+          <QuickTagGrid groups={groupedTags} onTagPress={handleTagPress} searchQuery={searchQuery} />
         </ScrollView>
         <StressFAB />
       </View>

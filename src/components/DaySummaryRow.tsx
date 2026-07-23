@@ -1,10 +1,12 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { colors, spacing, typography, radius } from '../theme';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { colors, spacing, typography, radius, categoryColorLight } from '../theme';
 import type { DaySummary } from '../types/database';
 
 interface DaySummaryRowProps {
   summary: DaySummary;
+  activeCategories?: Set<string>;
+  onToggle?: (category: string) => void;
 }
 
 const badges = [
@@ -14,16 +16,30 @@ const badges = [
   { key: 'medication' as const, label: 'Medication', emoji: '💊', color: colors.medication },
 ];
 
-export function DaySummaryRow({ summary }: DaySummaryRowProps) {
+export function DaySummaryRow({ summary, activeCategories, onToggle }: DaySummaryRowProps) {
   return (
     <View style={styles.container}>
-      {badges.map((badge) => (
-        <View key={badge.key} style={[styles.badge, { borderColor: badge.color }]}>
-          <Text style={styles.emoji}>{badge.emoji}</Text>
-          <Text style={[styles.count, { color: badge.color }]}>{summary[badge.key]}</Text>
-          <Text style={styles.label}>{badge.label}</Text>
-        </View>
-      ))}
+      {badges.map((badge) => {
+        const isActive = activeCategories?.has(badge.key) ?? false;
+        return (
+          <Pressable
+            key={badge.key}
+            onPress={() => onToggle?.(badge.key)}
+            style={[
+              styles.badge,
+              { borderColor: badge.color },
+              isActive && {
+                borderWidth: 2,
+                backgroundColor: categoryColorLight(badge.key, 0.15),
+              },
+            ]}
+          >
+            <Text style={styles.emoji}>{badge.emoji}</Text>
+            <Text style={[styles.count, { color: badge.color }]}>{summary[badge.key]}</Text>
+            <Text style={styles.label}>{badge.label}</Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
