@@ -2,7 +2,7 @@ import type { GroqParsedResult, SuggestedObservation } from '../types/voice';
 import { generateUUID } from '../utils/uuid';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const MODEL = 'llama-3.3-70b-versatile';
+const MODEL = 'openai/gpt-oss-120b';
 
 const SYSTEM_PROMPT = `You are an assistant for a caregiving app that tracks behaviors and events for neurodiverse children. A caregiver has spoken into the app. Your job is to analyze their speech and extract structured observations.
 
