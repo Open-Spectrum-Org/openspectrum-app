@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+@theme {
+  /* Category colors */
+  --color-cat-behavior: #7C3AED;
+  --color-cat-food: #14B8A6;
+  --color-cat-medication: #F59E0B;
+  --color-cat-emotion: #EC4899;
+  --color-cat-sleep: #6366F1;
+  --color-cat-sensory: #8B5CF6;
+  --color-cat-transitions: #06B6D4;
+  --color-cat-successes: #22C55E;
+  --color-cat-trigger: #EF4444;
+  --color-cat-other: #6B7280;
+
+  /* UI colors */
+  --color-primary: #3B82F6;
+  --color-primary-light: #DBEAFE;
+  --color-surface: #F9FAFB;
+  --color-surface-alt: #F3F4F6;
+  --color-text-primary: #111827;
+  --color-text-secondary: #6B7280;
+  --color-text-muted: #9CA3AF;
+  --color-border: #E5E7EB;
+  --color-border-light: #F3F4F6;
+
+  /* Semantic */
+  --color-danger: #EF4444;
+  --color-danger-light: #FEE2E2;
+  --color-success: #22C55E;
+  --color-success-light: #DCFCE7;
+  --color-warning: #F59E0B;
+  --color-warning-light: #FEF3C7;
+
+  /* Reflection */
+  --color-better: #22C55E;
+  --color-typical: #3B82F6;
+  --color-difficult: #EF4444;
+}
+
+@layer base {
+  body {
+    @apply bg-white text-text-primary antialiased;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@keyframes pulse-mic {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+.animate-pulse-mic {
+  animation: pulse-mic 0.8s ease-in-out infinite;
+}
