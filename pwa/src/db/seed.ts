@@ -115,54 +115,24 @@ export async function seedDatabase(db: OpenSpectrumDB): Promise<void> {
     version: 1,
   });
 
-  // Insert test child
-  await db.children.put({
-    id: TEST_CHILD_ID,
-    family_id: TEST_FAMILY_ID,
-    display_name: 'Aarav',
-    birth_year_month: '2018-04',
-    avatar_url: null,
-    profile_notes: null,
+  // Insert system tags (child_tags are linked per-patient when a patient is created)
+  const tagDefs = SYSTEM_TAGS.map((tag, i) => ({
+    id: generateUUID(),
+    category: tag.category,
+    name: tag.name,
+    is_system: 1 as const,
+    child_id: null,
+    family_id: null,
+    display_order: i,
+    color: tag.color,
+    icon: null,
     created_at: now,
-    updated_at: now,
-    is_deleted: 0,
-    sync_status: 'pending',
+    is_deleted: 0 as const,
+    sync_status: 'pending' as const,
     last_synced_at: null,
     device_id: null,
     version: 1,
-  });
+  }));
 
-  // Insert system tags and child_tags
-  const tagDefs = SYSTEM_TAGS.map((tag, i) => {
-    const tagId = generateUUID();
-    return {
-      def: {
-        id: tagId,
-        category: tag.category,
-        name: tag.name,
-        is_system: 1 as const,
-        child_id: null,
-        family_id: null,
-        display_order: i,
-        color: tag.color,
-        icon: null,
-        created_at: now,
-        is_deleted: 0 as const,
-        sync_status: 'pending' as const,
-        last_synced_at: null,
-        device_id: null,
-        version: 1,
-      },
-      childTag: {
-        id: generateUUID(),
-        child_id: TEST_CHILD_ID,
-        tag_id: tagId,
-        is_enabled: 1 as const,
-        display_order: i,
-      },
-    };
-  });
-
-  await db.tag_definitions.bulkPut(tagDefs.map((t) => t.def));
-  await db.child_tags.bulkPut(tagDefs.map((t) => t.childTag));
+  await db.tag_definitions.bulkPut(tagDefs);
 }

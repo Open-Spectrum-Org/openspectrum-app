@@ -1,12 +1,38 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { DatabaseProvider, useDatabaseReady } from './hooks/useDatabase';
-import { ChildProvider } from './hooks/useChild';
+import { ChildProvider, useChild } from './hooks/useChild';
 import { NavBar } from './components/NavBar';
 import Home from './pages/Home';
 import Timeline from './pages/Timeline';
 import Insights from './pages/Insights';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
+import { SetupScreen } from './pages/SetupScreen';
+
+function AppRoutes() {
+  const { children, isLoaded } = useChild();
+
+  if (!isLoaded) return null;
+
+  if (children.length === 0) {
+    return <SetupScreen />;
+  }
+
+  return (
+    <div className="h-screen flex flex-col">
+      <div className="flex-1 overflow-hidden pb-[60px]">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/timeline" element={<Timeline />} />
+          <Route path="/insights" element={<Insights />} />
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/settings" element={<Settings />} />
+        </Routes>
+      </div>
+      <NavBar />
+    </div>
+  );
+}
 
 function AppContent() {
   const isReady = useDatabaseReady();
@@ -21,18 +47,7 @@ function AppContent() {
 
   return (
     <ChildProvider>
-      <div className="h-screen flex flex-col">
-        <div className="flex-1 overflow-hidden pb-[60px]">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/timeline" element={<Timeline />} />
-            <Route path="/insights" element={<Insights />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/settings" element={<Settings />} />
-          </Routes>
-        </div>
-        <NavBar />
-      </div>
+      <AppRoutes />
     </ChildProvider>
   );
 }
