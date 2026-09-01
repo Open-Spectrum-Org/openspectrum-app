@@ -5,9 +5,10 @@ interface DateNavigatorProps {
   date: string;
   onPrev: () => void;
   onNext: () => void;
+  onToday?: () => void;
 }
 
-export function DateNavigator({ date, onPrev, onNext }: DateNavigatorProps) {
+export function DateNavigator({ date, onPrev, onNext, onToday }: DateNavigatorProps) {
   const { child } = useChild();
   const isTodayDate = isToday(date);
   const dateLabel = formatDateDisplay(date);
@@ -28,6 +29,14 @@ export function DateNavigator({ date, onPrev, onNext }: DateNavigatorProps) {
           ›
         </span>
       </button>
+      {!isTodayDate && onToday && (
+        <button
+          onClick={onToday}
+          className="ml-1 px-2 py-0.5 text-xs font-semibold text-primary border border-primary rounded-full"
+        >
+          Today
+        </button>
+      )}
     </div>
   );
 }

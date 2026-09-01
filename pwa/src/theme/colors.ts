@@ -9,6 +9,7 @@ export const colors = {
   transitions: '#06B6D4',
   successes: '#22C55E',
   trigger: '#EF4444',
+  transcript: '#F97316',
   other: '#6B7280',
 
   // UI colors

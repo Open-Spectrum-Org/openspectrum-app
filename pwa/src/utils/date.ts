@@ -13,13 +13,15 @@ export function formatTime(isoString: string): string {
 
 export function formatDateDisplay(dateString: string): string {
   const today = todayDateString();
-  if (dateString === today) return 'Today';
+  const date = new Date(dateString + 'T00:00:00');
+  const shortDate = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+
+  if (dateString === today) return `Today (${shortDate})`;
 
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  if (dateString === yesterday.toISOString().split('T')[0]) return 'Yesterday';
+  if (dateString === yesterday.toISOString().split('T')[0]) return `Yesterday (${shortDate})`;
 
-  const date = new Date(dateString + 'T00:00:00');
   return date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
 }
 

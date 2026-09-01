@@ -16,14 +16,17 @@ export function NavBar() {
           key={tab.to}
           to={tab.to}
           end={tab.to === '/'}
-          className={({ isActive }) =>
-            `flex-1 flex flex-col items-center justify-center gap-0.5 pt-1 pb-2 ${
-              isActive ? 'text-primary' : 'text-text-muted'
-            }`
-          }
+          className="flex-1 flex flex-col items-center justify-center gap-0.5 pt-1 pb-2 relative"
         >
-          <span className="text-xl">{tab.icon}</span>
-          <span className="text-[11px] font-semibold">{tab.label}</span>
+          {({ isActive }) => (
+            <>
+              {isActive && (
+                <span className="absolute top-0 left-3 right-3 h-0.5 bg-primary rounded-b-full" />
+              )}
+              <span className={`text-xl ${isActive ? 'text-primary' : 'text-text-muted'}`}>{tab.icon}</span>
+              <span className={`text-[11px] font-semibold ${isActive ? 'text-primary' : 'text-text-muted'}`}>{tab.label}</span>
+            </>
+          )}
         </NavLink>
       ))}
     </nav>

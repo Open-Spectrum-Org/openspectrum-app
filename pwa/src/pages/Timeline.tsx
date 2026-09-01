@@ -64,24 +64,24 @@ export default function Timeline() {
 
   return (
     <div className="flex flex-col h-full bg-surface">
+      <AppHeader
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        placeholder="Search entries..."
+        showHome={true}
+      />
+      <DateNavigator
+        date={date}
+        onPrev={() => setDate(addDays(date, -1))}
+        onNext={() => setDate(addDays(date, 1))}
+        onToday={() => setDate(todayDateString())}
+      />
+      <DaySummaryRow
+        summary={summary}
+        activeCategories={activeCategories}
+        onToggle={handleToggleCategory}
+      />
       <div className="flex-1 overflow-y-auto pb-12">
-        <AppHeader
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          placeholder="Search entries..."
-          showHome={true}
-        />
-        <DateNavigator
-          date={date}
-          onPrev={() => setDate(addDays(date, -1))}
-          onNext={() => setDate(addDays(date, 1))}
-        />
-        <DaySummaryRow
-          summary={summary}
-          activeCategories={activeCategories}
-          onToggle={handleToggleCategory}
-        />
-
         {filteredObservations.length === 0 ? (
           <div className="flex flex-col items-center py-12 gap-3">
             <span className="text-5xl">📝</span>

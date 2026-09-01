@@ -24,7 +24,7 @@ export async function saveVoiceLogWithObservations(
       created_by: userId,
       occurred_at: now,
       entry_type: 'voice',
-      category: 'other',
+      category: 'transcript',
       title: transcript,
       notes: aiSummary || null,
       incident_data: null,
