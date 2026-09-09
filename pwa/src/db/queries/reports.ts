@@ -1,4 +1,5 @@
 import { db } from '../database';
+import type { AssessmentScale } from '../../types/database';
 
 export interface CategoryCount {
   category: string;
@@ -238,5 +239,126 @@ export async function getReflectionCorrelation(
     rating,
     avgObservations:
       Math.round((counts.reduce((s, c) => s + c, 0) / counts.length) * 10) / 10,
+  }));
+}
+
+// ─── Phase 5: Intelligence ───────────────────────────────────────────────────
+
+export interface AssessmentAverage {
+  scaleId: string;
+  scaleName: string;
+  scaleType: 'numeric' | 'categorical';
+  avg: number | null;
+  maxValue: number | null;
+  count: number;
+  distribution: Record<string, number>;
+}
+
+/** Average numeric scores and categorical distributions for observation assessments in a date range */
+export async function getAssessmentAverages(
+  childId: string,
+  startDate: string,
+  endDate: string
+): Promise<AssessmentAverage[]> {
+  const start = `${startDate}T00:00:00.000Z`;
+  const end = `${endDate}T23:59:59.999Z`;
+
+  const obs = await db.observations
+    .where('[child_id+occurred_at]')
+    .between([childId, start], [childId, end], true, true)
+    .filter((o) => o.is_deleted === 0)
+    .toArray();
+
+  if (obs.length === 0) return [];
+
+  const obsIds = obs.map((o) => o.id);
+  const assessments = await db.observation_assessments
+    .where('observation_id')
+    .anyOf(obsIds)
+    .toArray();
+
+  if (assessments.length === 0) return [];
+
+  const scaleIds = [...new Set(assessments.map((a) => a.scale_id))];
+  const scales = (await db.assessment_scales.bulkGet(scaleIds)).filter(
+    (s): s is AssessmentScale => s !== undefined
+  );
+  const scaleMap = new Map(scales.map((s) => [s.id, s]));
+
+  const byScale = new Map<string, { numerics: number[]; categoricals: string[] }>();
+  for (const a of assessments) {
+    if (!byScale.has(a.scale_id)) byScale.set(a.scale_id, { numerics: [], categoricals: [] });
+    const group = byScale.get(a.scale_id)!;
+    if (a.numeric_value !== null) group.numerics.push(a.numeric_value);
+    if (a.categorical_value !== null) group.categoricals.push(a.categorical_value);
+  }
+
+  const result: AssessmentAverage[] = [];
+  for (const [scaleId, group] of byScale) {
+    const scale = scaleMap.get(scaleId);
+    if (!scale) continue;
+
+    const isNumeric = scale.scale_type === 'numeric';
+    const count = isNumeric ? group.numerics.length : group.categoricals.length;
+    if (count === 0) continue;
+
+    let avg: number | null = null;
+    if (isNumeric && group.numerics.length > 0) {
+      const sum = group.numerics.reduce((s, v) => s + v, 0);
+      avg = Math.round((sum / group.numerics.length) * 10) / 10;
+    }
+
+    const distribution: Record<string, number> = {};
+    for (const val of group.categoricals) {
+      distribution[val] = (distribution[val] ?? 0) + 1;
+    }
+
+    result.push({
+      scaleId,
+      scaleName: scale.name,
+      scaleType: scale.scale_type,
+      avg,
+      maxValue: scale.max_value,
+      count,
+      distribution,
+    });
+  }
+
+  return result.sort((a, b) => b.count - a.count);
+}
+
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+
+export interface DayOfWeekCount {
+  dayIndex: number;
+  dayLabel: string;
+  count: number;
+}
+
+/** Observation count grouped by day of week (0 = Sunday) for a date range */
+export async function getDayOfWeekPattern(
+  childId: string,
+  startDate: string,
+  endDate: string
+): Promise<DayOfWeekCount[]> {
+  const start = `${startDate}T00:00:00.000Z`;
+  const end = `${endDate}T23:59:59.999Z`;
+
+  const obs = await db.observations
+    .where('[child_id+occurred_at]')
+    .between([childId, start], [childId, end], true, true)
+    .filter((o) => o.is_deleted === 0)
+    .toArray();
+
+  const counts = new Map<number, number>();
+  for (const o of obs) {
+    const dow = new Date(o.occurred_at).getDay();
+    counts.set(dow, (counts.get(dow) ?? 0) + 1);
+  }
+
+  return [0, 1, 2, 3, 4, 5, 6].map((i) => ({
+    dayIndex: i,
+    dayLabel: DAY_LABELS[i]!,
+    count: counts.get(i) ?? 0,
   }));
 }

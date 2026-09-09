@@ -4,12 +4,14 @@ import { AssessmentSheet } from '../components/AssessmentSheet';
 import { ChildSelector } from '../components/ChildSelector';
 import { CreateTagSheet } from '../components/CreateTagSheet';
 import { MicButton } from '../components/MicButton';
+import { PromptsCard } from '../components/PromptsCard';
 import { QuickTagGrid } from '../components/QuickTagGrid';
 import { StressFAB } from '../components/StressFAB';
 import { TimeOffsetPicker, type TimeSelection } from '../components/TimeOffsetPicker';
 import { Toast } from '../components/Toast';
 import { VoiceReviewSheet } from '../components/VoiceReviewSheet';
 import { useChild } from '../hooks/useChild';
+import { useContextualPrompts } from '../hooks/useContextualPrompts';
 import { useTags } from '../hooks/useTags';
 import { useToast } from '../hooks/useToast';
 import { useVoiceCapture } from '../hooks/useVoiceCapture';
@@ -36,6 +38,7 @@ export default function Home() {
   const { groupedTags, refresh } = useTags();
   const { toast, showToast, hideToast } = useToast();
   const voice = useVoiceCapture();
+  const { prompts, dismiss: dismissPrompts } = useContextualPrompts(null, false);
 
   const handleTagPress = async (tag: TagWithCategory, position: { x: number; y: number }) => {
     if (!child) return;
@@ -94,6 +97,7 @@ export default function Home() {
         showHome={false}
       />
       <ChildSelector />
+      <PromptsCard prompts={prompts} onDismiss={dismissPrompts} />
       <div className="flex-1 overflow-y-auto pb-[100px]">
         <MicButton
           onPress={voice.state === 'recording' ? voice.stopRecording : voice.startRecording}

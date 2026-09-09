@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { AppHeader } from '../components/AppHeader';
 import { useInsightsData } from '../hooks/useInsightsData';
+import { generateHypotheses } from '../utils/insights';
 import { colors, categoryColor, categoryColorLight } from '../theme';
 import { todayDateString, addDays } from '../utils/date';
 
@@ -24,6 +25,8 @@ const RATING_INFO: Record<string, { label: string; emoji: string; color: string 
   difficult: { label: 'Difficult days', emoji: '😟', color: colors.difficult },
 };
 
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
 function hourLabel(h: number): string {
   if (h === 0) return '12a';
   if (h < 12) return `${h}a`;
@@ -34,8 +37,9 @@ function hourLabel(h: number): string {
 export default function Insights() {
   const [range, setRange] = useState<RangeOption>('7');
   const today = todayDateString();
-  const startDate = addDays(today, -parseInt(range) + 1);
-  const { data, loading } = useInsightsData(startDate, today);
+  const periodDays = parseInt(range);
+  const startDate = addDays(today, -periodDays + 1);
+  const { data, loading } = useInsightsData(startDate, today, periodDays);
 
   const peakHour = useMemo(() => {
     if (!data?.hourlyDistribution.length) return null;
@@ -59,13 +63,57 @@ export default function Insights() {
 
   const avgPerDay = useMemo(() => {
     if (!data) return 0;
-    const days = parseInt(range);
-    return Math.round((data.totalCount / days) * 10) / 10;
-  }, [data, range]);
+    return Math.round((data.totalCount / periodDays) * 10) / 10;
+  }, [data, periodDays]);
 
   const maxHourly = useMemo(() => {
     if (!data?.hourlyDistribution.length) return 0;
     return Math.max(...data.hourlyDistribution.map((h) => h.count));
+  }, [data]);
+
+  // Period comparison: % change vs prior period
+  const periodChangePct = useMemo(() => {
+    if (!data) return null;
+    const priorTotal = data.priorCategoryBreakdown.reduce((s, c) => s + c.count, 0);
+    if (priorTotal === 0) return null;
+    return Math.round(((data.totalCount - priorTotal) / priorTotal) * 100);
+  }, [data]);
+
+  // Category trend: compare current vs prior for each category
+  const categoryTrends = useMemo(() => {
+    if (!data) return new Map<string, number>();
+    const priorMap = new Map(data.priorCategoryBreakdown.map((c) => [c.category, c.count]));
+    const priorTotal = data.priorCategoryBreakdown.reduce((s, c) => s + c.count, 0);
+    const result = new Map<string, number>();
+    if (priorTotal === 0) return result;
+    for (const c of data.categoryBreakdown) {
+      const prior = priorMap.get(c.category) ?? 0;
+      if (prior > 0) {
+        result.set(c.category, Math.round(((c.count - prior) / prior) * 100));
+      }
+    }
+    return result;
+  }, [data]);
+
+  // Hypotheses from rules engine
+  const hypotheses = useMemo(() => {
+    if (!data) return [];
+    return generateHypotheses({
+      totalCount: data.totalCount,
+      categoryBreakdown: data.categoryBreakdown,
+      priorCategoryBreakdown: data.priorCategoryBreakdown,
+      hourlyDistribution: data.hourlyDistribution,
+      reflectionCorrelation: data.reflectionCorrelation,
+      topTags: data.topTags,
+      dayOfWeekPattern: data.dayOfWeekPattern,
+      assessmentAverages: data.assessmentAverages,
+      dailyCounts: data.dailyCounts,
+    });
+  }, [data]);
+
+  const maxDayOfWeek = useMemo(() => {
+    if (!data?.dayOfWeekPattern.length) return 0;
+    return Math.max(...data.dayOfWeekPattern.map((d) => d.count));
   }, [data]);
 
   return (
@@ -101,18 +149,25 @@ export default function Insights() {
           </div>
         ) : (
           <>
-            {/* Summary cards */}
+            {/* Summary cards — with period comparison badge */}
             <div className="flex gap-2">
-              {[
-                { value: data.totalCount, label: 'Total Logs' },
-                { value: avgPerDay, label: 'Per Day' },
-                { value: data.categoryBreakdown.length, label: 'Categories' },
-              ].map((card) => (
-                <div key={card.label} className="flex-1 bg-surface rounded-[10px] p-3 text-center border border-border">
-                  <div className="text-[22px] font-semibold text-primary">{card.value}</div>
-                  <div className="text-xs text-text-secondary">{card.label}</div>
-                </div>
-              ))}
+              <div className="flex-1 bg-surface rounded-[10px] p-3 text-center border border-border">
+                <div className="text-[22px] font-semibold text-primary">{data.totalCount}</div>
+                <div className="text-xs text-text-secondary">Total Logs</div>
+                {periodChangePct !== null && (
+                  <div className={`text-[10px] font-semibold mt-0.5 ${periodChangePct >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                    {periodChangePct >= 0 ? '▲' : '▼'} {Math.abs(periodChangePct)}% vs prior
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 bg-surface rounded-[10px] p-3 text-center border border-border">
+                <div className="text-[22px] font-semibold text-primary">{avgPerDay}</div>
+                <div className="text-xs text-text-secondary">Per Day</div>
+              </div>
+              <div className="flex-1 bg-surface rounded-[10px] p-3 text-center border border-border">
+                <div className="text-[22px] font-semibold text-primary">{data.categoryBreakdown.length}</div>
+                <div className="text-xs text-text-secondary">Categories</div>
+              </div>
             </div>
 
             {/* Trend insight */}
@@ -132,6 +187,35 @@ export default function Insights() {
               </div>
             )}
 
+            {/* Category breakdown with trend indicators */}
+            {data.categoryBreakdown.length > 0 && (
+              <div className="mt-4">
+                <h3 className="text-lg font-semibold text-text-primary mb-3">Categories</h3>
+                {data.categoryBreakdown.map((c) => {
+                  const trendPct = categoryTrends.get(c.category);
+                  return (
+                    <div key={c.category} className="flex items-center py-2 gap-3">
+                      <div
+                        className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: categoryColorLight(c.category, 0.15) }}
+                      >
+                        <span className="text-sm">{CATEGORY_EMOJIS[c.category] ?? '📝'}</span>
+                      </div>
+                      <span className="flex-1 text-base text-text-primary capitalize">{c.category}</span>
+                      {trendPct !== undefined && Math.abs(trendPct) >= 10 && (
+                        <span className={`text-xs font-semibold ${trendPct > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                          {trendPct > 0 ? '↑' : '↓'}{Math.abs(trendPct)}%
+                        </span>
+                      )}
+                      <span className="text-sm font-semibold" style={{ color: categoryColor(c.category) }}>
+                        {c.count}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             {/* Peak hour */}
             {peakHour && (
               <div className="flex bg-surface rounded-[10px] p-4 border border-border gap-3">
@@ -140,23 +224,6 @@ export default function Insights() {
                   <div className="text-sm font-semibold text-text-primary mb-1">Busiest Time</div>
                   <div className="text-sm text-text-secondary leading-5">
                     Most observations logged around {hourLabel(peakHour.hour)} ({peakHour.count} entries).
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Top category */}
-            {data.categoryBreakdown.length > 0 && (
-              <div className="flex bg-surface rounded-[10px] p-4 border border-border gap-3">
-                <span className="text-[28px]">
-                  {CATEGORY_EMOJIS[data.categoryBreakdown[0]!.category] ?? '📝'}
-                </span>
-                <div className="flex-1">
-                  <div className="text-sm font-semibold text-text-primary mb-1">Most Tracked</div>
-                  <div className="text-sm text-text-secondary leading-5">
-                    <span className="font-semibold capitalize">{data.categoryBreakdown[0]!.category}</span>{' '}
-                    is the most logged category with {data.categoryBreakdown[0]!.count} observations (
-                    {Math.round((data.categoryBreakdown[0]!.count / data.totalCount) * 100)}%).
                   </div>
                 </div>
               </div>
@@ -181,6 +248,21 @@ export default function Insights() {
               </div>
             )}
 
+            {/* Hypotheses / Patterns & Insights */}
+            {hypotheses.length > 0 && (
+              <div className="mt-4">
+                <h3 className="text-lg font-semibold text-text-primary mb-3">Patterns & Insights</h3>
+                <div className="space-y-3">
+                  {hypotheses.map((h) => (
+                    <div key={h.id} className="flex bg-surface rounded-[10px] p-4 border border-border gap-3">
+                      <span className="text-[24px] leading-none mt-0.5">{h.icon}</span>
+                      <p className="flex-1 text-sm text-text-secondary leading-5">{h.text}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Hourly distribution */}
             {data.hourlyDistribution.length > 0 && (
               <div className="mt-4">
@@ -198,6 +280,74 @@ export default function Insights() {
                       <span className="text-[9px] text-text-muted mt-0.5 h-3">
                         {h.hour % 3 === 0 ? hourLabel(h.hour) : ''}
                       </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Day of week distribution */}
+            {data.dayOfWeekPattern.some((d) => d.count > 0) && (
+              <div className="mt-4">
+                <h3 className="text-lg font-semibold text-text-primary mb-3">Day of Week</h3>
+                <div className="flex items-end h-[80px] gap-1">
+                  {data.dayOfWeekPattern.map((d) => (
+                    <div key={d.dayIndex} className="flex-1 flex flex-col items-center justify-end">
+                      <div
+                        className="w-full rounded-sm"
+                        style={{
+                          height: maxDayOfWeek > 0 ? Math.max((d.count / maxDayOfWeek) * 52, d.count > 0 ? 2 : 0) : 0,
+                          backgroundColor: colors.primaryLight,
+                        }}
+                      />
+                      <span className="text-[9px] text-text-muted mt-1">{DAY_LABELS[d.dayIndex]}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Assessment averages */}
+            {data.assessmentAverages.length > 0 && (
+              <div className="mt-4">
+                <h3 className="text-lg font-semibold text-text-primary mb-3">Assessment Scores</h3>
+                <div className="space-y-2">
+                  {data.assessmentAverages.map((a) => (
+                    <div key={a.scaleId} className="bg-surface rounded-[10px] p-4 border border-border">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-semibold text-text-primary">{a.scaleName}</span>
+                        <span className="text-xs text-text-muted">{a.count} ratings</span>
+                      </div>
+                      {a.scaleType === 'numeric' && a.avg !== null && a.maxValue !== null ? (
+                        <>
+                          <div className="flex items-baseline gap-1 mb-1">
+                            <span className="text-[22px] font-semibold text-primary">{a.avg}</span>
+                            <span className="text-sm text-text-muted">/ {a.maxValue}</span>
+                          </div>
+                          <div className="h-2 bg-border rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${(a.avg / a.maxValue) * 100}%`,
+                                backgroundColor: colors.primary,
+                              }}
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {Object.entries(a.distribution)
+                            .sort((x, y) => y[1] - x[1])
+                            .map(([val, cnt]) => (
+                              <span
+                                key={val}
+                                className="px-2 py-0.5 bg-white border border-border rounded-full text-xs text-text-secondary"
+                              >
+                                {val}: {cnt}
+                              </span>
+                            ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
