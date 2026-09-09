@@ -1,6 +1,7 @@
 import { db } from '../database';
 import { generateUUID } from '../../utils/uuid';
 import { nowISO } from '../../utils/date';
+import { getAssessmentsForObservations } from './assessments';
 import type { ObservationWithTags, TagDefinition, DaySummary, Observation } from '../../types/database';
 
 export async function insertQuickTapObservation(
@@ -52,6 +53,43 @@ export async function insertQuickTapObservation(
   return id;
 }
 
+async function attachTagsAndAssessments(observations: Observation[]): Promise<ObservationWithTags[]> {
+  if (observations.length === 0) return [];
+
+  const ids = observations.map((o) => o.id);
+
+  // Bulk-load all observation_tags for these observations
+  const allOTags = await db.observation_tags
+    .where('observation_id')
+    .anyOf(ids)
+    .toArray();
+
+  // Bulk-load all tag definitions
+  const tagIds = [...new Set(allOTags.map((ot) => ot.tag_id))];
+  const tagDefs = (await db.tag_definitions.bulkGet(tagIds)).filter(
+    (t): t is TagDefinition => t !== undefined
+  );
+  const tagMap = new Map(tagDefs.map((t) => [t.id, t]));
+
+  // Group tags by observation
+  const obsTags: Record<string, TagDefinition[]> = {};
+  for (const ot of allOTags) {
+    const tag = tagMap.get(ot.tag_id);
+    if (!tag) continue;
+    if (!obsTags[ot.observation_id]) obsTags[ot.observation_id] = [];
+    obsTags[ot.observation_id]!.push(tag);
+  }
+
+  // Bulk-load assessments
+  const assessmentMap = await getAssessmentsForObservations(ids);
+
+  return observations.map((obs) => ({
+    ...obs,
+    tags: obsTags[obs.id] ?? [],
+    assessments: assessmentMap[obs.id] ?? [],
+  }));
+}
+
 export async function getObservationsByDate(
   childId: string,
   date: string
@@ -66,22 +104,25 @@ export async function getObservationsByDate(
     .reverse()
     .toArray();
 
-  const result: ObservationWithTags[] = [];
-  for (const obs of observations) {
-    const otags = await db.observation_tags
-      .where('observation_id')
-      .equals(obs.id)
-      .toArray();
+  return attachTagsAndAssessments(observations);
+}
 
-    const tagIds = otags.map((ot) => ot.tag_id);
-    const tags = (await db.tag_definitions.bulkGet(tagIds)).filter(
-      (t): t is TagDefinition => t !== undefined
-    );
+export async function getObservationsByDateRange(
+  childId: string,
+  startDate: string,
+  endDate: string
+): Promise<ObservationWithTags[]> {
+  const start = `${startDate}T00:00:00.000Z`;
+  const end = `${endDate}T23:59:59.999Z`;
 
-    result.push({ ...obs, tags });
-  }
+  const observations = await db.observations
+    .where('[child_id+occurred_at]')
+    .between([childId, start], [childId, end], true, true)
+    .filter((o) => o.is_deleted === 0)
+    .reverse()
+    .toArray();
 
-  return result;
+  return attachTagsAndAssessments(observations);
 }
 
 export async function softDeleteObservation(observationId: string): Promise<void> {

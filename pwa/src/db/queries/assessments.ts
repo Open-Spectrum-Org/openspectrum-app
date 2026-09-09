@@ -1,7 +1,7 @@
 import { db } from '../database';
 import { generateUUID } from '../../utils/uuid';
 import { nowISO } from '../../utils/date';
-import type { AssessmentScale, ObservationAssessment } from '../../types/database';
+import type { AssessmentScale, AssessmentWithScale, ObservationAssessment } from '../../types/database';
 
 export async function getSystemScales(): Promise<AssessmentScale[]> {
   return db.assessment_scales
@@ -77,4 +77,30 @@ export async function insertObservationAssessment(
 
 export async function deleteObservationAssessment(assessmentId: string): Promise<void> {
   await db.observation_assessments.delete(assessmentId);
+}
+
+export async function getAssessmentsForObservations(
+  ids: string[]
+): Promise<Record<string, AssessmentWithScale[]>> {
+  if (ids.length === 0) return {};
+
+  const assessments = await db.observation_assessments
+    .where('observation_id')
+    .anyOf(ids)
+    .toArray();
+
+  const scaleIds = [...new Set(assessments.map((a) => a.scale_id))];
+  const scales = (await db.assessment_scales.bulkGet(scaleIds)).filter(
+    (s): s is AssessmentScale => s !== undefined
+  );
+  const scaleMap = new Map(scales.map((s) => [s.id, s]));
+
+  const result: Record<string, AssessmentWithScale[]> = {};
+  for (const a of assessments) {
+    const scale = scaleMap.get(a.scale_id);
+    if (!scale) continue;
+    if (!result[a.observation_id]) result[a.observation_id] = [];
+    result[a.observation_id]!.push({ ...a, scale });
+  }
+  return result;
 }

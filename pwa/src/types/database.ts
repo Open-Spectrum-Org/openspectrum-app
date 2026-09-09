@@ -256,8 +256,13 @@ export interface TagWithCategory extends TagDefinition {
   is_enabled: number;
 }
 
+export interface AssessmentWithScale extends ObservationAssessment {
+  scale: AssessmentScale;
+}
+
 export interface ObservationWithTags extends Observation {
   tags: TagDefinition[];
+  assessments?: AssessmentWithScale[];
 }
 
 export interface DaySummary {

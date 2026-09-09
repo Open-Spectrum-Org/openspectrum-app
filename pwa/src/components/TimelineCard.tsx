@@ -1,11 +1,35 @@
 import { useState } from 'react';
 import { categoryColor } from '../theme/colors';
 import { formatTime } from '../utils/date';
-import type { ObservationWithTags } from '../types/database';
+import type { ObservationWithTags, AssessmentWithScale } from '../types/database';
 
 interface TimelineCardProps {
   observation: ObservationWithTags;
   onDelete: (id: string) => void;
+}
+
+function displayTime(obs: ObservationWithTags): string {
+  if (obs.event_time_precision === 'date_only') return 'Earlier';
+  if (obs.event_time_precision === 'approximate') return `~${formatTime(obs.occurred_at)}`;
+  return formatTime(obs.occurred_at);
+}
+
+function AssessmentBadge({ a }: { a: AssessmentWithScale }) {
+  const { scale, numeric_value, categorical_value } = a;
+  if (scale.scale_type === 'numeric' && numeric_value !== null) {
+    const label = `${scale.name} ${numeric_value}${scale.max_value != null ? `/${scale.max_value}` : ''}`;
+    return (
+      <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{label}</span>
+    );
+  }
+  if (categorical_value) {
+    return (
+      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+        {scale.name}: {categorical_value}
+      </span>
+    );
+  }
+  return null;
 }
 
 export function TimelineCard({ observation, onDelete }: TimelineCardProps) {
@@ -13,13 +37,14 @@ export function TimelineCard({ observation, onDelete }: TimelineCardProps) {
   const tagNames = observation.tags.map((t) => t.name).join(', ');
   const isVoice = observation.entry_type === 'voice' && observation.notes;
   const [showSummary, setShowSummary] = useState(false);
+  const assessments = observation.assessments ?? [];
 
   return (
     <div className="flex bg-white rounded-[10px] mx-4 my-1 shadow-sm overflow-hidden">
       <div className="w-1" style={{ backgroundColor: barColor }} />
       <div className="flex-1 p-3 space-y-1">
         <div className="flex justify-between items-center">
-          <span className="text-xs text-text-secondary">{formatTime(observation.occurred_at)}</span>
+          <span className="text-xs text-text-secondary">{displayTime(observation)}</span>
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold capitalize" style={{ color: barColor }}>
               {observation.category}
@@ -48,6 +73,13 @@ export function TimelineCard({ observation, onDelete }: TimelineCardProps) {
         )}
         {tagNames && observation.title && (
           <p className="text-xs text-text-muted">{tagNames}</p>
+        )}
+        {assessments.length > 0 && (
+          <div className="flex flex-wrap gap-1 pt-0.5">
+            {assessments.map((a) => (
+              <AssessmentBadge key={a.id} a={a} />
+            ))}
+          </div>
         )}
       </div>
     </div>
