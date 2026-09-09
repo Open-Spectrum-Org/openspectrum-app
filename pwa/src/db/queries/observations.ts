@@ -1,12 +1,13 @@
 import { db } from '../database';
 import { generateUUID } from '../../utils/uuid';
 import { nowISO } from '../../utils/date';
-import type { ObservationWithTags, TagDefinition, DaySummary } from '../../types/database';
+import type { ObservationWithTags, TagDefinition, DaySummary, Observation } from '../../types/database';
 
 export async function insertQuickTapObservation(
   childId: string,
   userId: string,
-  tag: TagDefinition
+  tag: TagDefinition,
+  options?: { occurredAt?: string; precision?: Observation['event_time_precision'] }
 ): Promise<string> {
   const id = generateUUID();
   const now = nowISO();
@@ -15,8 +16,8 @@ export async function insertQuickTapObservation(
     id,
     child_id: childId,
     created_by: userId,
-    occurred_at: now,
-    event_time_precision: 'exact',
+    occurred_at: options?.occurredAt ?? now,
+    event_time_precision: options?.precision ?? 'exact',
     event_end_at: null,
     event_timezone: null,
     entry_type: 'quick_tap',

@@ -1,4 +1,6 @@
 import { db } from '../database';
+import { generateUUID } from '../../utils/uuid';
+import { nowISO } from '../../utils/date';
 import type { TagWithCategory } from '../../types/database';
 
 export async function getEnabledTagsForChild(childId: string): Promise<TagWithCategory[]> {
@@ -33,6 +35,44 @@ export interface GroupedTags {
   category: string;
   color: string;
   tags: TagWithCategory[];
+}
+
+export async function insertCustomTag(
+  name: string,
+  category: string,
+  color: string,
+  childId: string
+): Promise<string> {
+  const tagId = generateUUID();
+  const now = nowISO();
+
+  await db.tag_definitions.put({
+    id: tagId,
+    category,
+    name,
+    is_system: 0,
+    child_id: childId,
+    family_id: null,
+    display_order: 999,
+    color,
+    icon: null,
+    created_at: now,
+    is_deleted: 0,
+    sync_status: 'pending',
+    last_synced_at: null,
+    device_id: null,
+    version: 1,
+  });
+
+  await db.child_tags.put({
+    id: generateUUID(),
+    child_id: childId,
+    tag_id: tagId,
+    is_enabled: 1,
+    display_order: 999,
+  });
+
+  return tagId;
 }
 
 export function groupTagsByCategory(tags: TagWithCategory[]): GroupedTags[] {

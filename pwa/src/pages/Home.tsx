@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { AppHeader } from '../components/AppHeader';
+import { AssessmentSheet } from '../components/AssessmentSheet';
 import { ChildSelector } from '../components/ChildSelector';
+import { CreateTagSheet } from '../components/CreateTagSheet';
 import { MicButton } from '../components/MicButton';
 import { QuickTagGrid } from '../components/QuickTagGrid';
 import { StressFAB } from '../components/StressFAB';
+import { TimeOffsetPicker, type TimeSelection } from '../components/TimeOffsetPicker';
 import { Toast } from '../components/Toast';
 import { VoiceReviewSheet } from '../components/VoiceReviewSheet';
 import { useChild } from '../hooks/useChild';
@@ -11,21 +14,54 @@ import { useTags } from '../hooks/useTags';
 import { useToast } from '../hooks/useToast';
 import { useVoiceCapture } from '../hooks/useVoiceCapture';
 import { insertQuickTapObservation } from '../db/queries/observations';
+import { getScalesForCategory } from '../db/queries/assessments';
 import { saveVoiceLogWithObservations } from '../db/queries/voiceLogs';
 import { TEST_USER_ID } from '../db/seed';
-import type { TagWithCategory } from '../types/database';
+import { recordTagUse } from '../utils/tagUsage';
+import type { AssessmentScale, TagWithCategory } from '../types/database';
+
+const DEFAULT_TIME: TimeSelection = { occurredAt: null, precision: 'exact' };
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [timeSelection, setTimeSelection] = useState<TimeSelection>(DEFAULT_TIME);
+  const [showCreateTag, setShowCreateTag] = useState(false);
+  const [pendingAssessment, setPendingAssessment] = useState<{
+    observationId: string;
+    tagName: string;
+    scale: AssessmentScale;
+  } | null>(null);
+
   const { child } = useChild();
-  const { groupedTags } = useTags();
+  const { groupedTags, refresh } = useTags();
   const { toast, showToast, hideToast } = useToast();
   const voice = useVoiceCapture();
 
   const handleTagPress = async (tag: TagWithCategory, position: { x: number; y: number }) => {
     if (!child) return;
-    await insertQuickTapObservation(child.id, TEST_USER_ID, tag);
-    showToast(`${tag.name} logged`, { position });
+
+    const options =
+      timeSelection.occurredAt !== null
+        ? { occurredAt: timeSelection.occurredAt, precision: timeSelection.precision }
+        : undefined;
+
+    const observationId = await insertQuickTapObservation(child.id, TEST_USER_ID, tag, options);
+    recordTagUse(child.id, tag.id);
+
+    const scales = await getScalesForCategory(tag.category);
+    if (scales.length > 0) {
+      const scale = scales[0]!;
+      showToast(`${tag.name} logged`, {
+        position,
+        duration: 3500,
+        action: {
+          label: 'Rate ›',
+          onClick: () => setPendingAssessment({ observationId, tagName: tag.name, scale }),
+        },
+      });
+    } else {
+      showToast(`${tag.name} logged`, { position });
+    }
   };
 
   const handleVoiceConfirm = async () => {
@@ -64,7 +100,13 @@ export default function Home() {
           state={voice.state}
           durationSeconds={voice.durationSeconds}
         />
-        <QuickTagGrid groups={groupedTags} onTagPress={handleTagPress} searchQuery={searchQuery} />
+        <TimeOffsetPicker value={timeSelection} onChange={setTimeSelection} />
+        <QuickTagGrid
+          groups={groupedTags}
+          onTagPress={handleTagPress}
+          searchQuery={searchQuery}
+          onCreateTag={() => setShowCreateTag(true)}
+        />
       </div>
       <StressFAB />
       <VoiceReviewSheet
@@ -83,9 +125,31 @@ export default function Home() {
       <Toast
         message={toast.message}
         visible={toast.visible}
+        undoAction={toast.undoAction}
+        action={toast.action}
         onHide={hideToast}
         position={toast.position}
       />
+      {child && (
+        <CreateTagSheet
+          visible={showCreateTag}
+          childId={child.id}
+          onSave={() => {
+            setShowCreateTag(false);
+            refresh();
+          }}
+          onClose={() => setShowCreateTag(false)}
+        />
+      )}
+      {pendingAssessment && (
+        <AssessmentSheet
+          visible={true}
+          observationId={pendingAssessment.observationId}
+          tagName={pendingAssessment.tagName}
+          scale={pendingAssessment.scale}
+          onClose={() => setPendingAssessment(null)}
+        />
+      )}
     </div>
   );
 }

@@ -2,11 +2,12 @@ interface ToastProps {
   message: string;
   visible: boolean;
   undoAction?: () => void;
+  action?: { label: string; onClick: () => void };
   onHide: () => void;
   position?: { x: number; y: number };
 }
 
-export function Toast({ message, visible, undoAction, onHide, position }: ToastProps) {
+export function Toast({ message, visible, undoAction, action, onHide, position }: ToastProps) {
   if (!visible) return null;
 
   const posStyle = position
@@ -29,6 +30,17 @@ export function Toast({ message, visible, undoAction, onHide, position }: ToastP
             className="px-2 py-1 text-sm font-semibold text-primary"
           >
             Undo
+          </button>
+        )}
+        {action && (
+          <button
+            onClick={() => {
+              action.onClick();
+              onHide();
+            }}
+            className="px-2 py-1 text-sm font-semibold text-primary"
+          >
+            {action.label}
           </button>
         )}
       </div>
