@@ -32,7 +32,7 @@ export interface InsightsData {
   dayOfWeekPattern: DayOfWeekCount[];
 }
 
-export function useInsightsData(startDate: string, endDate: string, periodDays: number) {
+export function useInsightsData(startDate: string, endDate: string, periodDays: number, categories?: string[]) {
   const { child } = useChild();
   const [data, setData] = useState<InsightsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,15 +55,15 @@ export function useInsightsData(startDate: string, endDate: string, periodDays: 
       assessmentAverages,
       dayOfWeekPattern,
     ] = await Promise.all([
-      getTotalCount(child.id, startDate, endDate),
-      getCategoryBreakdown(child.id, startDate, endDate),
-      getDailyCounts(child.id, startDate, endDate),
-      getHourlyDistribution(child.id, startDate, endDate),
+      getTotalCount(child.id, startDate, endDate, categories),
+      getCategoryBreakdown(child.id, startDate, endDate, categories),
+      getDailyCounts(child.id, startDate, endDate, categories),
+      getHourlyDistribution(child.id, startDate, endDate, categories),
       getReflectionCorrelation(child.id, startDate, endDate),
-      getTopTags(child.id, startDate, endDate, 5),
-      getCategoryBreakdown(child.id, priorStart, priorEnd),
-      getAssessmentAverages(child.id, startDate, endDate),
-      getDayOfWeekPattern(child.id, startDate, endDate),
+      getTopTags(child.id, startDate, endDate, 5, categories),
+      getCategoryBreakdown(child.id, priorStart, priorEnd, categories),
+      getAssessmentAverages(child.id, startDate, endDate, categories),
+      getDayOfWeekPattern(child.id, startDate, endDate, categories),
     ]);
 
     setData({
@@ -78,7 +78,7 @@ export function useInsightsData(startDate: string, endDate: string, periodDays: 
       dayOfWeekPattern,
     });
     setLoading(false);
-  }, [child?.id, startDate, endDate, periodDays]);
+  }, [child?.id, startDate, endDate, periodDays, categories]);
 
   useEffect(() => {
     refresh();

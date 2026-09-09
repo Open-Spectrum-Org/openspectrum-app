@@ -36,7 +36,8 @@ export interface CategoryReflectionCorrelation {
 export async function getCategoryBreakdown(
   childId: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  categories?: string[]
 ): Promise<CategoryCount[]> {
   const start = `${startDate}T00:00:00.000Z`;
   const end = `${endDate}T23:59:59.999Z`;
@@ -44,7 +45,7 @@ export async function getCategoryBreakdown(
   const obs = await db.observations
     .where('[child_id+occurred_at]')
     .between([childId, start], [childId, end], true, true)
-    .filter((o) => o.is_deleted === 0)
+    .filter((o) => o.is_deleted === 0 && (!categories || categories.includes(o.category)))
     .toArray();
 
   const counts = new Map<string, number>();
@@ -61,7 +62,8 @@ export async function getCategoryBreakdown(
 export async function getDailyCounts(
   childId: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  categories?: string[]
 ): Promise<DailyCount[]> {
   const start = `${startDate}T00:00:00.000Z`;
   const end = `${endDate}T23:59:59.999Z`;
@@ -69,7 +71,7 @@ export async function getDailyCounts(
   const obs = await db.observations
     .where('[child_id+occurred_at]')
     .between([childId, start], [childId, end], true, true)
-    .filter((o) => o.is_deleted === 0)
+    .filter((o) => o.is_deleted === 0 && (!categories || categories.includes(o.category)))
     .toArray();
 
   const counts = new Map<string, number>();
@@ -88,7 +90,8 @@ export async function getTopTags(
   childId: string,
   startDate: string,
   endDate: string,
-  limit = 10
+  limit = 10,
+  categories?: string[]
 ): Promise<TagCount[]> {
   const start = `${startDate}T00:00:00.000Z`;
   const end = `${endDate}T23:59:59.999Z`;
@@ -96,7 +99,7 @@ export async function getTopTags(
   const obs = await db.observations
     .where('[child_id+occurred_at]')
     .between([childId, start], [childId, end], true, true)
-    .filter((o) => o.is_deleted === 0)
+    .filter((o) => o.is_deleted === 0 && (!categories || categories.includes(o.category)))
     .toArray();
 
   const obsIds = new Set(obs.map((o) => o.id));
@@ -127,7 +130,8 @@ export async function getTopTags(
 export async function getTotalCount(
   childId: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  categories?: string[]
 ): Promise<number> {
   const start = `${startDate}T00:00:00.000Z`;
   const end = `${endDate}T23:59:59.999Z`;
@@ -135,7 +139,7 @@ export async function getTotalCount(
   return db.observations
     .where('[child_id+occurred_at]')
     .between([childId, start], [childId, end], true, true)
-    .filter((o) => o.is_deleted === 0)
+    .filter((o) => o.is_deleted === 0 && (!categories || categories.includes(o.category)))
     .count();
 }
 
@@ -143,7 +147,8 @@ export async function getTotalCount(
 export async function getHourlyDistribution(
   childId: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  categories?: string[]
 ): Promise<HourCount[]> {
   const start = `${startDate}T00:00:00.000Z`;
   const end = `${endDate}T23:59:59.999Z`;
@@ -151,7 +156,7 @@ export async function getHourlyDistribution(
   const obs = await db.observations
     .where('[child_id+occurred_at]')
     .between([childId, start], [childId, end], true, true)
-    .filter((o) => o.is_deleted === 0)
+    .filter((o) => o.is_deleted === 0 && (!categories || categories.includes(o.category)))
     .toArray();
 
   const counts = new Map<number, number>();
@@ -258,7 +263,8 @@ export interface AssessmentAverage {
 export async function getAssessmentAverages(
   childId: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  categories?: string[]
 ): Promise<AssessmentAverage[]> {
   const start = `${startDate}T00:00:00.000Z`;
   const end = `${endDate}T23:59:59.999Z`;
@@ -266,7 +272,7 @@ export async function getAssessmentAverages(
   const obs = await db.observations
     .where('[child_id+occurred_at]')
     .between([childId, start], [childId, end], true, true)
-    .filter((o) => o.is_deleted === 0)
+    .filter((o) => o.is_deleted === 0 && (!categories || categories.includes(o.category)))
     .toArray();
 
   if (obs.length === 0) return [];
@@ -339,7 +345,8 @@ export interface DayOfWeekCount {
 export async function getDayOfWeekPattern(
   childId: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  categories?: string[]
 ): Promise<DayOfWeekCount[]> {
   const start = `${startDate}T00:00:00.000Z`;
   const end = `${endDate}T23:59:59.999Z`;
@@ -347,7 +354,7 @@ export async function getDayOfWeekPattern(
   const obs = await db.observations
     .where('[child_id+occurred_at]')
     .between([childId, start], [childId, end], true, true)
-    .filter((o) => o.is_deleted === 0)
+    .filter((o) => o.is_deleted === 0 && (!categories || categories.includes(o.category)))
     .toArray();
 
   const counts = new Map<number, number>();

@@ -7,10 +7,12 @@ import { generateContextualPrompts, type ContextualPrompt } from '../utils/insig
  *
  * @param topCategory  Most frequently logged category (pass null if unknown)
  * @param hasReflectionToday  Whether a daily reflection has been saved today
+ * @param recentMeltdownCount  Number of behavior observations in the last 2 days
  */
 export function useContextualPrompts(
   topCategory: string | null,
-  hasReflectionToday: boolean
+  hasReflectionToday: boolean,
+  recentMeltdownCount: number
 ) {
   const [dismissed, setDismissed] = useState(false);
 
@@ -20,9 +22,9 @@ export function useContextualPrompts(
       hourOfDay: new Date().getHours(),
       topCategory,
       hasReflectionToday,
-      recentMeltdownCount: 0,
+      recentMeltdownCount,
     });
-  }, [dismissed, topCategory, hasReflectionToday]);
+  }, [dismissed, topCategory, hasReflectionToday, recentMeltdownCount]);
 
   const dismiss = useCallback(() => setDismissed(true), []);
 

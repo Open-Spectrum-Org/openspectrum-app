@@ -93,3 +93,19 @@ export async function unlinkObservationFromFocusArea(
     .equals([observationId, focusAreaId])
     .delete();
 }
+
+/** Batch-load focus area IDs linked to a set of observations. */
+export async function getLinkedFocusAreaIdsForObservations(
+  obsIds: string[]
+): Promise<Record<string, string[]>> {
+  if (obsIds.length === 0) return {};
+  const links = await db.observation_focus_areas
+    .where('observation_id')
+    .anyOf(obsIds)
+    .toArray();
+  const result: Record<string, string[]> = {};
+  for (const link of links) {
+    (result[link.observation_id] ??= []).push(link.focus_area_id);
+  }
+  return result;
+}

@@ -1,9 +1,14 @@
 import { useMemo, useState } from 'react';
 import { AppHeader } from '../components/AppHeader';
 import { useInsightsData } from '../hooks/useInsightsData';
+import { useFocusAreas } from '../hooks/useFocusAreas';
 import { generateHypotheses } from '../utils/insights';
 import { colors, categoryColor, categoryColorLight } from '../theme';
 import { todayDateString, addDays } from '../utils/date';
+
+function parseCats(json: string | null): string[] {
+  try { return json ? JSON.parse(json) : []; } catch { return []; }
+}
 
 type RangeOption = '7' | '14' | '30';
 
@@ -36,10 +41,26 @@ function hourLabel(h: number): string {
 
 export default function Insights() {
   const [range, setRange] = useState<RangeOption>('7');
+  const [activeFocusAreaId, setActiveFocusAreaId] = useState<string | null>(null);
   const today = todayDateString();
   const periodDays = parseInt(range);
   const startDate = addDays(today, -periodDays + 1);
-  const { data, loading } = useInsightsData(startDate, today, periodDays);
+
+  const { areas } = useFocusAreas();
+  const activeFocusAreas = useMemo(() => areas.filter((a) => a.status === 'active'), [areas]);
+
+  const selectedFocusArea = activeFocusAreaId
+    ? areas.find((a) => a.id === activeFocusAreaId) ?? null
+    : null;
+
+  const selectedCategories = selectedFocusArea
+    ? parseCats(selectedFocusArea.related_categories)
+    : undefined;
+
+  const { data, loading } = useInsightsData(
+    startDate, today, periodDays,
+    selectedCategories?.length ? selectedCategories : undefined
+  );
 
   const peakHour = useMemo(() => {
     if (!data?.hourlyDistribution.length) return null;
@@ -136,6 +157,38 @@ export default function Insights() {
             </button>
           ))}
         </div>
+
+        {/* Focus area filter */}
+        {activeFocusAreas.length > 0 && (
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => setActiveFocusAreaId(null)}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                activeFocusAreaId === null
+                  ? 'bg-primary text-white border-primary'
+                  : 'border-border text-text-secondary bg-surface'
+              }`}
+            >
+              All data
+            </button>
+            {activeFocusAreas.map((area) => (
+              <button
+                key={area.id}
+                onClick={() => setActiveFocusAreaId(area.id)}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                  activeFocusAreaId === area.id
+                    ? 'bg-primary text-white border-primary'
+                    : 'border-border text-text-secondary bg-surface'
+                }`}
+              >
+                🎯 {area.title}
+              </button>
+            ))}
+          </div>
+        )}
+        {selectedFocusArea && (
+          <p className="text-xs text-text-secondary">Showing: {selectedFocusArea.title}</p>
+        )}
 
         {loading ? (
           <div className="flex justify-center pt-24">

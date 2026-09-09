@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AppHeader } from '../components/AppHeader';
 import { AssessmentSheet } from '../components/AssessmentSheet';
 import { ChildSelector } from '../components/ChildSelector';
@@ -15,11 +15,12 @@ import { useContextualPrompts } from '../hooks/useContextualPrompts';
 import { useTags } from '../hooks/useTags';
 import { useToast } from '../hooks/useToast';
 import { useVoiceCapture } from '../hooks/useVoiceCapture';
-import { insertQuickTapObservation } from '../db/queries/observations';
+import { insertQuickTapObservation, getObservationCategoryCountsByDateRange } from '../db/queries/observations';
 import { getScalesForCategory } from '../db/queries/assessments';
 import { saveVoiceLogWithObservations } from '../db/queries/voiceLogs';
 import { TEST_USER_ID } from '../db/seed';
 import { recordTagUse } from '../utils/tagUsage';
+import { todayDateString, addDays } from '../utils/date';
 import type { AssessmentScale, TagWithCategory } from '../types/database';
 
 const DEFAULT_TIME: TimeSelection = { occurredAt: null, precision: 'exact' };
@@ -34,11 +35,28 @@ export default function Home() {
     scale: AssessmentScale;
   } | null>(null);
 
+  const [topCategory, setTopCategory] = useState<string | null>(null);
+  const [recentBehaviorCount, setRecentBehaviorCount] = useState(0);
+
   const { child } = useChild();
   const { groupedTags, refresh } = useTags();
   const { toast, showToast, hideToast } = useToast();
   const voice = useVoiceCapture();
-  const { prompts, dismiss: dismissPrompts } = useContextualPrompts(null, false);
+
+  useEffect(() => {
+    if (!child) return;
+    const today = todayDateString();
+    Promise.all([
+      getObservationCategoryCountsByDateRange(child.id, addDays(today, -6), today),
+      getObservationCategoryCountsByDateRange(child.id, addDays(today, -1), today),
+    ]).then(([weekCounts, recentCounts]) => {
+      const top = Object.entries(weekCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+      setTopCategory(top);
+      setRecentBehaviorCount(recentCounts['behavior'] ?? 0);
+    });
+  }, [child?.id]);
+
+  const { prompts, dismiss: dismissPrompts } = useContextualPrompts(topCategory, false, recentBehaviorCount);
 
   const handleTagPress = async (tag: TagWithCategory, position: { x: number; y: number }) => {
     if (!child) return;

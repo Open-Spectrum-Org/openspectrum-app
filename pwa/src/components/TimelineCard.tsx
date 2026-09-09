@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { categoryColor } from '../theme/colors';
 import { formatTime } from '../utils/date';
-import type { ObservationWithTags, AssessmentWithScale } from '../types/database';
+import type { FocusArea, ObservationWithTags, AssessmentWithScale } from '../types/database';
 
 interface TimelineCardProps {
   observation: ObservationWithTags;
   onDelete: (id: string) => void;
+  activeFocusAreas?: FocusArea[];
+  linkedAreaIds?: string[];
+  onLinkPress?: () => void;
 }
 
 function displayTime(obs: ObservationWithTags): string {
@@ -32,12 +35,14 @@ function AssessmentBadge({ a }: { a: AssessmentWithScale }) {
   return null;
 }
 
-export function TimelineCard({ observation, onDelete }: TimelineCardProps) {
+export function TimelineCard({ observation, onDelete, activeFocusAreas, linkedAreaIds, onLinkPress }: TimelineCardProps) {
   const barColor = categoryColor(observation.category);
   const tagNames = observation.tags.map((t) => t.name).join(', ');
   const isVoice = observation.entry_type === 'voice' && observation.notes;
   const [showSummary, setShowSummary] = useState(false);
   const assessments = observation.assessments ?? [];
+  const showLinkButton = (activeFocusAreas?.length ?? 0) > 0;
+  const linkedCount = linkedAreaIds?.length ?? 0;
 
   return (
     <div className="flex bg-white rounded-[10px] mx-4 my-1 shadow-sm overflow-hidden">
@@ -49,6 +54,11 @@ export function TimelineCard({ observation, onDelete }: TimelineCardProps) {
             <span className="text-xs font-semibold capitalize" style={{ color: barColor }}>
               {observation.category}
             </span>
+            {showLinkButton && (
+              <button onClick={onLinkPress} className="p-1">
+                <span className="text-xs text-text-muted">🎯</span>
+              </button>
+            )}
             <button
               onClick={() => onDelete(observation.id)}
               className="p-1"
@@ -80,6 +90,11 @@ export function TimelineCard({ observation, onDelete }: TimelineCardProps) {
               <AssessmentBadge key={a.id} a={a} />
             ))}
           </div>
+        )}
+        {linkedCount > 0 && (
+          <span className="text-xs text-text-muted">
+            🎯 {linkedCount} focus area{linkedCount === 1 ? '' : 's'}
+          </span>
         )}
       </div>
     </div>

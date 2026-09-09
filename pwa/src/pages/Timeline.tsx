@@ -1,8 +1,9 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
 import { DateNavigator } from '../components/DateNavigator';
 import { DaySummaryRow } from '../components/DaySummaryRow';
+import { FocusLinkSheet } from '../components/FocusLinkSheet';
 import { TimelineCard } from '../components/TimelineCard';
 import { TimelineRow } from '../components/TimelineRow';
 import { ReflectionWidget } from '../components/ReflectionWidget';
@@ -15,6 +16,11 @@ import { useFocusAreas } from '../hooks/useFocusAreas';
 import { todayDateString, addDays, formatDateDisplay } from '../utils/date';
 import { categoryColor } from '../theme/colors';
 import { tagMatchesQuery } from '../utils/tagSynonyms';
+import {
+  getLinkedFocusAreaIdsForObservations,
+  linkObservationToFocusArea,
+  unlinkObservationFromFocusArea,
+} from '../db/queries/focusAreas';
 import type { FocusArea, ObservationWithTags } from '../types/database';
 
 type ViewMode = 'day' | 'week';
@@ -35,6 +41,9 @@ export default function Timeline() {
   const [activeFocusAreaId, setActiveFocusAreaId] = useState<string | null>(
     (location.state as { focusAreaId?: string } | null)?.focusAreaId ?? null
   );
+
+  const [linkedFocusAreaIds, setLinkedFocusAreaIds] = useState<Record<string, string[]>>({});
+  const [linkSheet, setLinkSheet] = useState<{ obsId: string } | null>(null);
 
   const { observations, deleteObservation, undoDelete } = useObservations(date);
   const { days: weekDays } = useWeekObservations(date);
@@ -131,6 +140,28 @@ export default function Timeline() {
       }),
     }));
   }, [weekDays, activeCategories, searchQuery, applyFocusFilter]);
+
+  useEffect(() => {
+    if (observations.length === 0) { setLinkedFocusAreaIds({}); return; }
+    getLinkedFocusAreaIdsForObservations(observations.map((o) => o.id))
+      .then(setLinkedFocusAreaIds);
+  }, [observations]);
+
+  const handleLink = useCallback(async (areaId: string) => {
+    if (!linkSheet) return;
+    await linkObservationToFocusArea(linkSheet.obsId, areaId, 'explicit');
+    getLinkedFocusAreaIdsForObservations([linkSheet.obsId]).then((updated) =>
+      setLinkedFocusAreaIds((prev) => ({ ...prev, ...updated }))
+    );
+  }, [linkSheet]);
+
+  const handleUnlink = useCallback(async (areaId: string) => {
+    if (!linkSheet) return;
+    await unlinkObservationFromFocusArea(linkSheet.obsId, areaId);
+    getLinkedFocusAreaIdsForObservations([linkSheet.obsId]).then((updated) =>
+      setLinkedFocusAreaIds((prev) => ({ ...prev, ...updated }))
+    );
+  }, [linkSheet]);
 
   const handleDelete = useCallback(async (id: string) => {
     await deleteObservation(id);
@@ -236,7 +267,14 @@ export default function Timeline() {
               </div>
             ) : (
               filteredObservations.map((obs) => (
-                <TimelineCard key={obs.id} observation={obs} onDelete={handleDelete} />
+                <TimelineCard
+                  key={obs.id}
+                  observation={obs}
+                  onDelete={handleDelete}
+                  activeFocusAreas={activeFocusAreas}
+                  linkedAreaIds={linkedFocusAreaIds[obs.id] ?? []}
+                  onLinkPress={() => setLinkSheet({ obsId: obs.id })}
+                />
               ))
             )}
             <ReflectionWidget reflection={reflection} onRate={setRating} />
@@ -277,6 +315,16 @@ export default function Timeline() {
         undoAction={toast.undoAction}
         onHide={hideToast}
       />
+      {linkSheet && (
+        <FocusLinkSheet
+          visible={true}
+          activeFocusAreas={activeFocusAreas}
+          linkedAreaIds={linkedFocusAreaIds[linkSheet.obsId] ?? []}
+          onLink={handleLink}
+          onUnlink={handleUnlink}
+          onClose={() => setLinkSheet(null)}
+        />
+      )}
     </div>
   );
 }
