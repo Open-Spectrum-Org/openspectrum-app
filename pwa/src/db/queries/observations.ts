@@ -139,6 +139,27 @@ export async function undoDeleteObservation(observationId: string): Promise<void
   });
 }
 
+export async function getObservationCategoryCountsByDateRange(
+  childId: string,
+  startDate: string,
+  endDate: string
+): Promise<Record<string, number>> {
+  const start = `${startDate}T00:00:00.000Z`;
+  const end = `${endDate}T23:59:59.999Z`;
+
+  const observations = await db.observations
+    .where('[child_id+occurred_at]')
+    .between([childId, start], [childId, end], true, true)
+    .filter((o) => o.is_deleted === 0)
+    .toArray();
+
+  const counts: Record<string, number> = {};
+  for (const obs of observations) {
+    counts[obs.category] = (counts[obs.category] ?? 0) + 1;
+  }
+  return counts;
+}
+
 export async function getDaySummary(childId: string, date: string): Promise<DaySummary> {
   const startOfDay = `${date}T00:00:00.000Z`;
   const endOfDay = `${date}T23:59:59.999Z`;

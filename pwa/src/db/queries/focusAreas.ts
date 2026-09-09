@@ -38,6 +38,13 @@ export async function insertFocusArea(
   return id;
 }
 
+export async function updateFocusArea(
+  id: string,
+  fields: Partial<Pick<FocusArea, 'title' | 'description' | 'status' | 'related_categories' | 'related_tag_ids' | 'questions'>>
+): Promise<void> {
+  await db.focus_areas.update(id, { ...fields, updated_at: nowISO() });
+}
+
 export async function updateFocusAreaStatus(
   focusAreaId: string,
   status: FocusArea['status']
