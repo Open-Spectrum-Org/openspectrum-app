@@ -64,6 +64,64 @@ const SYSTEM_TAGS: SystemTag[] = [
   { category: 'trigger', name: 'Unknown', color: '#EF4444' },
 ];
 
+interface SystemScale {
+  name: string;
+  scale_type: 'numeric' | 'categorical';
+  min_value: number | null;
+  max_value: number | null;
+  labels: string | null;
+  options: string | null;
+  applies_to_categories: string | null;
+}
+
+const SYSTEM_SCALES: SystemScale[] = [
+  {
+    name: 'Mood',
+    scale_type: 'numeric',
+    min_value: 1,
+    max_value: 5,
+    labels: JSON.stringify({ 1: 'Very Low', 2: 'Low', 3: 'Neutral', 4: 'High', 5: 'Very High' }),
+    options: null,
+    applies_to_categories: JSON.stringify(['emotion', 'behavior']),
+  },
+  {
+    name: 'Sleep Quality',
+    scale_type: 'numeric',
+    min_value: 1,
+    max_value: 5,
+    labels: JSON.stringify({ 1: 'Very Poor', 2: 'Poor', 3: 'Fair', 4: 'Good', 5: 'Very Good' }),
+    options: null,
+    applies_to_categories: JSON.stringify(['sleep']),
+  },
+  {
+    name: 'Behavior Severity',
+    scale_type: 'numeric',
+    min_value: 1,
+    max_value: 5,
+    labels: JSON.stringify({ 1: 'Mild', 2: 'Moderate', 3: 'Significant', 4: 'Severe', 5: 'Extreme' }),
+    options: null,
+    applies_to_categories: JSON.stringify(['behavior']),
+  },
+  {
+    name: 'Food Reaction',
+    scale_type: 'categorical',
+    min_value: null,
+    max_value: null,
+    labels: null,
+    options: JSON.stringify(['adverse', 'neutral', 'positive']),
+    applies_to_categories: JSON.stringify(['food']),
+  },
+  {
+    name: 'Medication Effect',
+    scale_type: 'categorical',
+    min_value: null,
+    max_value: null,
+    labels: null,
+    options: JSON.stringify(['worse', 'no_change', 'better']),
+    applies_to_categories: JSON.stringify(['medication']),
+  },
+];
+
 export async function seedDatabase(db: OpenSpectrumDB): Promise<void> {
   // Check if already seeded
   const userCount = await db.users.count();
@@ -135,4 +193,26 @@ export async function seedDatabase(db: OpenSpectrumDB): Promise<void> {
   }));
 
   await db.tag_definitions.bulkPut(tagDefs);
+
+  // Seed system assessment scales
+  const scaleDefs = SYSTEM_SCALES.map((scale) => ({
+    id: generateUUID(),
+    name: scale.name,
+    scale_type: scale.scale_type,
+    min_value: scale.min_value,
+    max_value: scale.max_value,
+    labels: scale.labels,
+    options: scale.options,
+    applies_to_categories: scale.applies_to_categories,
+    is_system: 1 as const,
+    child_id: null,
+    created_at: now,
+    is_deleted: 0 as const,
+    sync_status: 'pending' as const,
+    last_synced_at: null,
+    device_id: null,
+    version: 1,
+  }));
+
+  await db.assessment_scales.bulkPut(scaleDefs);
 }
