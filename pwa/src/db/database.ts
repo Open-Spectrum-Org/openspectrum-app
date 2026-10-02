@@ -135,6 +135,33 @@ class OpenSpectrumDB extends Dexie {
         }));
         await tx.table('assessment_scales').bulkPut(scaleDefs);
       });
+
+    // v3: backfill system scales for users already on v2 with an empty table
+    this.version(3).upgrade(async (tx) => {
+      const existing = await tx.table('assessment_scales').count();
+      if (existing > 0) return;
+
+      const now = nowISO();
+      const scaleDefs = SYSTEM_SCALES.map((scale) => ({
+        id: generateUUID(),
+        name: scale.name,
+        scale_type: scale.scale_type,
+        min_value: scale.min_value,
+        max_value: scale.max_value,
+        labels: scale.labels,
+        options: scale.options,
+        applies_to_categories: scale.applies_to_categories,
+        is_system: 1 as const,
+        child_id: null,
+        created_at: now,
+        is_deleted: 0 as const,
+        sync_status: 'pending' as const,
+        last_synced_at: null,
+        device_id: null,
+        version: 1,
+      }));
+      await tx.table('assessment_scales').bulkPut(scaleDefs);
+    });
   }
 }
 
