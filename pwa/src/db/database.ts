@@ -1,4 +1,7 @@
 import Dexie, { type EntityTable, type Table } from 'dexie';
+import { SYSTEM_SCALES } from './seed';
+import { generateUUID } from '../utils/uuid';
+import { nowISO } from '../utils/date';
 import type {
   User,
   Family,
@@ -71,9 +74,9 @@ class OpenSpectrumDB extends Dexie {
         focus_areas: 'id, child_id, status',
         observation_focus_areas: '[observation_id+focus_area_id], observation_id, focus_area_id',
       })
-      .upgrade((tx) => {
+      .upgrade(async (tx) => {
         // Migrate existing observations: set new required fields to safe defaults
-        return tx
+        await tx
           .table('observations')
           .toCollection()
           .modify((obs) => {
@@ -109,6 +112,28 @@ class OpenSpectrumDB extends Dexie {
               obs.event_data = obs.incident_data ?? null;
             }
           });
+
+        // Seed system assessment scales (table is new in v2, always empty on upgrade)
+        const now = nowISO();
+        const scaleDefs = SYSTEM_SCALES.map((scale) => ({
+          id: generateUUID(),
+          name: scale.name,
+          scale_type: scale.scale_type,
+          min_value: scale.min_value,
+          max_value: scale.max_value,
+          labels: scale.labels,
+          options: scale.options,
+          applies_to_categories: scale.applies_to_categories,
+          is_system: 1 as const,
+          child_id: null,
+          created_at: now,
+          is_deleted: 0 as const,
+          sync_status: 'pending' as const,
+          last_synced_at: null,
+          device_id: null,
+          version: 1,
+        }));
+        await tx.table('assessment_scales').bulkPut(scaleDefs);
       });
   }
 }

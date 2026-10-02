@@ -74,7 +74,7 @@ interface SystemScale {
   applies_to_categories: string | null;
 }
 
-const SYSTEM_SCALES: SystemScale[] = [
+export const SYSTEM_SCALES: SystemScale[] = [
   {
     name: 'Mood',
     scale_type: 'numeric',
