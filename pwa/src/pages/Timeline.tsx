@@ -13,7 +13,7 @@ import { useWeekObservations } from '../hooks/useWeekObservations';
 import { useReflection } from '../hooks/useReflection';
 import { useToast } from '../hooks/useToast';
 import { useFocusAreas } from '../hooks/useFocusAreas';
-import { todayDateString, addDays, formatDateDisplay } from '../utils/date';
+import { todayDateString, addDays, formatDateDisplay, isToday } from '../utils/date';
 import { categoryColor } from '../theme/colors';
 import { tagMatchesQuery } from '../utils/tagSynonyms';
 import {
@@ -29,9 +29,18 @@ function parseCats(json: string | null): string[] {
   try { return json ? JSON.parse(json) : []; } catch { return []; }
 }
 
+function formatDateForButton(dateString: string): string {
+  return new Date(dateString + 'T00:00:00').toLocaleDateString([], {
+    weekday: 'short', month: 'short', day: 'numeric',
+  });
+}
+
 export default function Timeline() {
   const navigate = useNavigate();
   const location = useLocation();
+
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [pickerTime, setPickerTime] = useState('');
 
   const [date, setDate] = useState(todayDateString());
   const [viewMode, setViewMode] = useState<ViewMode>('day');
@@ -302,13 +311,72 @@ export default function Timeline() {
 
         <div className="px-4 py-3">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => {
+              if (isToday(date)) {
+                navigate('/');
+              } else {
+                const now = new Date();
+                setPickerTime(
+                  `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+                );
+                setShowTimePicker(true);
+              }
+            }}
             className="w-full bg-primary rounded-[10px] py-3 text-center"
           >
-            <span className="text-base font-semibold text-white">Log an Event</span>
+            <span className="text-base font-semibold text-white">
+              {isToday(date) ? 'Log an Event' : `Log Event for ${formatDateForButton(date)}`}
+            </span>
           </button>
         </div>
       </div>
+
+      {/* Time-picker bottom sheet for historical dates */}
+      {showTimePicker && (
+        <div
+          className="fixed inset-0 z-50 flex items-end bg-black/40"
+          onClick={() => setShowTimePicker(false)}
+        >
+          <div
+            className="w-full bg-white rounded-t-2xl p-5 pb-8 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-base font-semibold text-text-primary mb-1">
+              What time did this happen?
+            </h2>
+            <p className="text-sm text-text-secondary mb-4">
+              {new Date(date + 'T00:00:00').toLocaleDateString([], {
+                weekday: 'long', month: 'long', day: 'numeric',
+              })}
+            </p>
+            <input
+              type="time"
+              value={pickerTime}
+              onChange={(e) => setPickerTime(e.target.value)}
+              className="w-full border border-border rounded-[8px] px-3 py-3 text-lg text-text-primary bg-surface mb-4"
+            />
+            <button
+              onClick={() => {
+                const occurredAt = new Date(`${date}T${pickerTime}:00`).toISOString();
+                navigate('/', { state: { historicalDate: date, occurredAt, precision: 'exact' } });
+                setShowTimePicker(false);
+              }}
+              className="w-full bg-primary text-white rounded-[10px] py-3 text-base font-semibold mb-2"
+            >
+              Continue
+            </button>
+            <button
+              onClick={() => {
+                navigate('/', { state: { historicalDate: date, occurredAt: date, precision: 'date_only' } });
+                setShowTimePicker(false);
+              }}
+              className="w-full text-text-secondary text-sm py-2"
+            >
+              I don't know the exact time
+            </button>
+          </div>
+        </div>
+      )}
       <Toast
         message={toast.message}
         visible={toast.visible}

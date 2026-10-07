@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
-import { AssessmentSheet } from '../components/AssessmentSheet';
 import { ChildSelector } from '../components/ChildSelector';
 import { CreateTagSheet } from '../components/CreateTagSheet';
 import { MicButton } from '../components/MicButton';
@@ -16,7 +16,7 @@ import { useTags } from '../hooks/useTags';
 import { useToast } from '../hooks/useToast';
 import { useVoiceCapture } from '../hooks/useVoiceCapture';
 import { insertQuickTapObservation, getObservationCategoryCountsByDateRange } from '../db/queries/observations';
-import { getScalesForCategory } from '../db/queries/assessments';
+import { getScalesForCategory, insertObservationAssessment } from '../db/queries/assessments';
 import { saveVoiceLogWithObservations } from '../db/queries/voiceLogs';
 import { TEST_USER_ID } from '../db/seed';
 import { recordTagUse } from '../utils/tagUsage';
@@ -25,13 +25,29 @@ import type { AssessmentScale, TagWithCategory } from '../types/database';
 
 const DEFAULT_TIME: TimeSelection = { occurredAt: null, precision: 'exact' };
 
+interface HistoricalNavState {
+  historicalDate: string;
+  occurredAt: string;
+  precision: 'exact' | 'date_only';
+}
+
 export default function Home() {
+  const location = useLocation();
+  const historicalState = (location.state as HistoricalNavState | null)?.historicalDate
+    ? (location.state as HistoricalNavState)
+    : null;
+
   const [searchQuery, setSearchQuery] = useState('');
-  const [timeSelection, setTimeSelection] = useState<TimeSelection>(DEFAULT_TIME);
+  const [timeSelection, setTimeSelection] = useState<TimeSelection>(() =>
+    historicalState
+      ? { occurredAt: historicalState.occurredAt, precision: historicalState.precision }
+      : DEFAULT_TIME
+  );
   const [showCreateTag, setShowCreateTag] = useState(false);
-  const [pendingAssessment, setPendingAssessment] = useState<{
+  const [inlineAssessment, setInlineAssessment] = useState<{
     observationId: string;
     tagName: string;
+    category: string;
     scale: AssessmentScale;
   } | null>(null);
 
@@ -71,14 +87,12 @@ export default function Home() {
 
     const scales = await getScalesForCategory(tag.category);
     if (scales.length > 0) {
-      const scale = scales[0]!;
-      showToast(`${tag.name} logged`, {
-        position,
-        duration: 3500,
-        action: {
-          label: 'Rate ›',
-          onClick: () => setPendingAssessment({ observationId, tagName: tag.name, scale }),
-        },
+      // Show rating pills inline — no toast
+      setInlineAssessment({
+        observationId,
+        tagName: tag.name,
+        category: tag.category,
+        scale: scales[0]!,
       });
     } else {
       showToast(`${tag.name} logged`, { position });
@@ -106,6 +120,23 @@ export default function Home() {
     }
   };
 
+  const handleRatingSelect = async (observationId: string, scaleId: string, value: number | string) => {
+    if (typeof value === 'number') {
+      await insertObservationAssessment(observationId, scaleId, { numeric_value: value });
+    } else {
+      await insertObservationAssessment(observationId, scaleId, { categorical_value: value });
+    }
+    const name = inlineAssessment?.tagName ?? '';
+    setInlineAssessment(null);
+    showToast(`${name} logged`);
+  };
+
+  const handleRatingSkip = () => {
+    const name = inlineAssessment?.tagName ?? '';
+    setInlineAssessment(null);
+    showToast(`${name} logged`);
+  };
+
   return (
     <div className="flex flex-col h-full bg-white">
       <AppHeader
@@ -115,6 +146,27 @@ export default function Home() {
         showHome={false}
       />
       <ChildSelector />
+
+      {/* Historical event banner */}
+      {historicalState && (
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-amber-50 border-b-2 border-amber-300">
+          <span className="text-xl">📅</span>
+          <div>
+            <span className="block text-xs font-bold text-amber-700 uppercase tracking-wide">
+              Logging a past event
+            </span>
+            <span className="block text-sm font-medium text-amber-800">
+              {new Date(historicalState.historicalDate + 'T00:00:00').toLocaleDateString([], {
+                weekday: 'long', month: 'long', day: 'numeric',
+              })}
+              {historicalState.precision === 'exact' && (
+                <> &middot; {new Date(historicalState.occurredAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</>
+              )}
+            </span>
+          </div>
+        </div>
+      )}
+
       <PromptsCard prompts={prompts} onDismiss={dismissPrompts} />
       <div className="flex-1 overflow-y-auto pb-[100px]">
         <MicButton
@@ -122,12 +174,15 @@ export default function Home() {
           state={voice.state}
           durationSeconds={voice.durationSeconds}
         />
-        <TimeOffsetPicker value={timeSelection} onChange={setTimeSelection} />
+        {!historicalState && <TimeOffsetPicker value={timeSelection} onChange={setTimeSelection} />}
         <QuickTagGrid
           groups={groupedTags}
           onTagPress={handleTagPress}
           searchQuery={searchQuery}
           onCreateTag={() => setShowCreateTag(true)}
+          pendingAssessment={inlineAssessment}
+          onRatingSelect={handleRatingSelect}
+          onRatingSkip={handleRatingSkip}
         />
       </div>
       <StressFAB />
@@ -161,15 +216,6 @@ export default function Home() {
             refresh();
           }}
           onClose={() => setShowCreateTag(false)}
-        />
-      )}
-      {pendingAssessment && (
-        <AssessmentSheet
-          visible={true}
-          observationId={pendingAssessment.observationId}
-          tagName={pendingAssessment.tagName}
-          scale={pendingAssessment.scale}
-          onClose={() => setPendingAssessment(null)}
         />
       )}
     </div>
