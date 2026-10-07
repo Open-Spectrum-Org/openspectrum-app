@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import type { VoiceRecordingState, GroqParsedResult } from '../types/voice';
-import { analyzeTranscript } from '../services/groqService';
+import { transcribeAudio, analyzeTranscript } from '../services/groqService';
 
 interface VoiceCaptureReturn {
   state: VoiceRecordingState;
@@ -19,6 +19,39 @@ interface VoiceCaptureReturn {
   reset: () => void;
 }
 
+// ── MediaRecorder helpers (Firefox fallback) ────────────────────────────────
+
+function pickMimeType(): string {
+  const candidates = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/ogg;codecs=opus',
+    'audio/ogg',
+    'audio/mp4',
+  ];
+  return candidates.find((t) => MediaRecorder.isTypeSupported(t)) ?? '';
+}
+
+function mimeToExtension(mimeType: string): string {
+  if (mimeType.startsWith('audio/ogg')) return 'ogg';
+  if (mimeType.startsWith('audio/mp4')) return 'mp4';
+  return 'webm';
+}
+
+// ── Capability detection ────────────────────────────────────────────────────
+
+const SpeechRecognitionClass =
+  typeof window !== 'undefined'
+    ? (window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null)
+    : null;
+
+const hasMediaRecorder =
+  typeof navigator !== 'undefined' &&
+  typeof navigator.mediaDevices?.getUserMedia === 'function' &&
+  typeof MediaRecorder !== 'undefined';
+
+// ── Hook ────────────────────────────────────────────────────────────────────
+
 export function useVoiceCapture(): VoiceCaptureReturn {
   const [state, setState] = useState<VoiceRecordingState>('idle');
   const [transcript, setTranscript] = useState('');
@@ -27,31 +60,35 @@ export function useVoiceCapture(): VoiceCaptureReturn {
   const [parsedResult, setParsedResult] = useState<GroqParsedResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Web Speech API refs
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+
+  // MediaRecorder refs (Firefox fallback)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+
   const startTimeRef = useRef<number>(0);
   const durationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const SpeechRecognitionClass =
-    typeof window !== 'undefined'
-      ? (window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null)
-      : null;
+  const isSupported = SpeechRecognitionClass !== null || hasMediaRecorder;
 
-  const isSupported = SpeechRecognitionClass !== null;
-
-  const startRecording = useCallback(() => {
-    if (!SpeechRecognitionClass) {
-      setError('Speech recognition not supported in this browser');
-      setState('error');
-      return;
+  const stopDurationTimer = useCallback(() => {
+    if (durationIntervalRef.current) {
+      clearInterval(durationIntervalRef.current);
+      durationIntervalRef.current = null;
     }
+  }, []);
 
-    setError(null);
-    setTranscript('');
-    setEditedTranscript('');
-    setParsedResult(null);
-    setDurationSeconds(0);
+  const stopStream = useCallback(() => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+  }, []);
 
-    const recognition = new SpeechRecognitionClass();
+  // ── Web Speech API path ──────────────────────────────────────────────────
+
+  const startWithSpeechRecognition = useCallback(() => {
+    const recognition = new SpeechRecognitionClass!();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = 'en-US';
@@ -72,6 +109,7 @@ export function useVoiceCapture(): VoiceCaptureReturn {
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      stopDurationTimer();
       if (event.error === 'not-allowed') {
         setError('Microphone access denied');
       } else if (event.error === 'no-speech') {
@@ -82,33 +120,22 @@ export function useVoiceCapture(): VoiceCaptureReturn {
         setError(`Speech error: ${event.error}`);
       }
       setState('error');
-      if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
     };
 
     recognition.onend = () => {
-      if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
+      stopDurationTimer();
     };
 
     recognitionRef.current = recognition;
-    startTimeRef.current = Date.now();
-
-    durationIntervalRef.current = setInterval(() => {
-      setDurationSeconds(Math.floor((Date.now() - startTimeRef.current) / 1000));
-    }, 1000);
-
     recognition.start();
-    setState('recording');
-  }, [SpeechRecognitionClass]);
+  }, [stopDurationTimer]);
 
-  const stopRecording = useCallback(() => {
+  const stopWithSpeechRecognition = useCallback(() => {
     if (recognitionRef.current) {
       recognitionRef.current.stop();
       recognitionRef.current = null;
     }
-    if (durationIntervalRef.current) {
-      clearInterval(durationIntervalRef.current);
-      durationIntervalRef.current = null;
-    }
+    stopDurationTimer();
     const duration = Math.floor((Date.now() - startTimeRef.current) / 1000);
     setDurationSeconds(duration);
     setState('transcribing');
@@ -120,7 +147,110 @@ export function useVoiceCapture(): VoiceCaptureReturn {
       });
       setState('review');
     }, 300);
+  }, [stopDurationTimer]);
+
+  // ── MediaRecorder path (Firefox) ─────────────────────────────────────────
+
+  const startWithMediaRecorder = useCallback(() => {
+    audioChunksRef.current = [];
+
+    navigator.mediaDevices
+      .getUserMedia({ audio: true })
+      .then((stream) => {
+        streamRef.current = stream;
+
+        const mimeType = pickMimeType();
+        const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) audioChunksRef.current.push(e.data);
+        };
+
+        recorder.onstop = async () => {
+          stopStream();
+          stopDurationTimer();
+          const duration = Math.floor((Date.now() - startTimeRef.current) / 1000);
+          setDurationSeconds(duration);
+          setState('transcribing');
+
+          const blob = new Blob(audioChunksRef.current, { type: mimeType || 'audio/webm' });
+          const ext = mimeToExtension(mimeType);
+
+          try {
+            const text = await transcribeAudio(blob, `recording.${ext}`);
+            const trimmed = text.trim();
+            setTranscript(trimmed);
+            setEditedTranscript(trimmed);
+            setState('review');
+          } catch (err) {
+            setError(err instanceof Error ? err.message : 'Transcription failed');
+            setState('error');
+          }
+        };
+
+        recorder.onerror = () => {
+          stopStream();
+          stopDurationTimer();
+          setError('Recording failed');
+          setState('error');
+        };
+
+        mediaRecorderRef.current = recorder;
+        recorder.start();
+        setState('recording');
+      })
+      .catch((err: unknown) => {
+        const name = err instanceof Error ? err.name : '';
+        setError(
+          name === 'NotAllowedError' || name === 'PermissionDeniedError'
+            ? 'Microphone access denied'
+            : 'Could not access microphone'
+        );
+        setState('error');
+      });
+  }, [stopStream, stopDurationTimer]);
+
+  const stopWithMediaRecorder = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current = null;
+    }
   }, []);
+
+  // ── Public API ───────────────────────────────────────────────────────────
+
+  const startRecording = useCallback(() => {
+    if (!isSupported) {
+      setError('Microphone recording is not supported in this browser');
+      setState('error');
+      return;
+    }
+
+    setError(null);
+    setTranscript('');
+    setEditedTranscript('');
+    setParsedResult(null);
+    setDurationSeconds(0);
+
+    startTimeRef.current = Date.now();
+    durationIntervalRef.current = setInterval(() => {
+      setDurationSeconds(Math.floor((Date.now() - startTimeRef.current) / 1000));
+    }, 1000);
+
+    if (SpeechRecognitionClass) {
+      startWithSpeechRecognition();
+    } else {
+      startWithMediaRecorder();
+    }
+  }, [isSupported, startWithSpeechRecognition, startWithMediaRecorder]);
+
+  const stopRecording = useCallback(() => {
+    if (SpeechRecognitionClass) {
+      stopWithSpeechRecognition();
+    } else {
+      stopWithMediaRecorder();
+    }
+  }, [stopWithSpeechRecognition, stopWithMediaRecorder]);
 
   const submitForAnalysis = useCallback(async () => {
     const textToAnalyze = editedTranscript || transcript;
@@ -169,17 +299,19 @@ export function useVoiceCapture(): VoiceCaptureReturn {
       recognitionRef.current.stop();
       recognitionRef.current = null;
     }
-    if (durationIntervalRef.current) {
-      clearInterval(durationIntervalRef.current);
-      durationIntervalRef.current = null;
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current = null;
     }
+    stopStream();
+    stopDurationTimer();
     setState('idle');
     setTranscript('');
     setEditedTranscript('');
     setDurationSeconds(0);
     setParsedResult(null);
     setError(null);
-  }, []);
+  }, [stopStream, stopDurationTimer]);
 
   return {
     state,

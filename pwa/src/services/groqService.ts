@@ -2,6 +2,29 @@ import type { GroqParsedResult, SuggestedObservation } from '../types/voice';
 import { generateUUID } from '../utils/uuid';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_WHISPER_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
+
+export async function transcribeAudio(audioBlob: Blob, filename = 'recording.webm'): Promise<string> {
+  const apiKey = import.meta.env.VITE_GROQ_API_KEY;
+  if (!apiKey) throw new Error('VITE_GROQ_API_KEY is not set');
+
+  const formData = new FormData();
+  formData.append('file', audioBlob, filename);
+  formData.append('model', 'whisper-large-v3-turbo');
+  formData.append('response_format', 'text');
+  formData.append('language', 'en');
+
+  const response = await fetch(GROQ_WHISPER_URL, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: formData,
+  });
+
+  if (response.status === 429) throw new Error('Rate limited — try again in a moment');
+  if (!response.ok) throw new Error(`Transcription error: ${response.status}`);
+
+  return response.text();
+}
 const MODEL = 'openai/gpt-oss-120b';
 
 const SYSTEM_PROMPT = `You are an assistant for a caregiving app that tracks behaviors and events for neurodiverse children. A caregiver has spoken into the app. Your job is to analyze their speech and extract structured observations.
