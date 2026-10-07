@@ -23,7 +23,7 @@ export function MicButton({ onPress, state, durationSeconds }: MicButtonProps) {
       : 'Tap to Speak';
 
   const buttonClasses = [
-    'w-[120px] h-[120px] rounded-full border-[3px] flex items-center justify-center',
+    'w-12 h-12 rounded-full border-[3px] flex items-center justify-center flex-shrink-0',
     isRecording
       ? 'bg-danger border-danger animate-pulse-mic'
       : isProcessing
@@ -32,26 +32,28 @@ export function MicButton({ onPress, state, durationSeconds }: MicButtonProps) {
   ].join(' ');
 
   return (
-    <div className="flex flex-col items-center py-4 gap-2">
+    <div className="flex items-center px-4 py-2 gap-3">
       <button
         onClick={isProcessing ? undefined : onPress}
         disabled={isProcessing}
         className={buttonClasses}
       >
         {isProcessing ? (
-          <div className="w-8 h-8 border-[3px] border-white border-t-transparent rounded-full animate-spin" />
+          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
         ) : (
-          <span className="text-5xl">{isRecording ? '🔴' : '🎙️'}</span>
+          <span className="text-2xl">{isRecording ? '🔴' : '🎙️'}</span>
         )}
       </button>
-      {isRecording && (
-        <span className="text-lg font-semibold text-danger tabular-nums">
-          {formatDuration(durationSeconds)}
+      <div className="flex flex-col">
+        <span className={`text-sm font-semibold ${isRecording ? 'text-danger' : 'text-text-secondary'}`}>
+          {label}
         </span>
-      )}
-      <span className={`text-xs ${isRecording ? 'text-danger font-semibold' : 'text-text-secondary'}`}>
-        {label}
-      </span>
+        {isRecording && (
+          <span className="text-lg font-bold text-danger tabular-nums">
+            {formatDuration(durationSeconds)}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
