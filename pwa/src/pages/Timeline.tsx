@@ -7,6 +7,7 @@ import { AssessmentSheet } from '../components/AssessmentSheet';
 import { FocusLinkSheet } from '../components/FocusLinkSheet';
 import { TimelineCard } from '../components/TimelineCard';
 import { TimelineRow } from '../components/TimelineRow';
+import { VoiceLogCard } from '../components/VoiceLogCard';
 import { ReflectionWidget } from '../components/ReflectionWidget';
 import { Toast } from '../components/Toast';
 import { useObservations } from '../hooks/useObservations';
@@ -59,7 +60,7 @@ export default function Timeline() {
     tagName: string;
   } | null>(null);
 
-  const { observations, refresh, deleteObservation, undoDelete } = useObservations(date);
+  const { observations, refresh, deleteObservation, undoDelete, deleteObservationGroup, undoDeleteGroup } = useObservations(date);
   const { days: weekDays } = useWeekObservations(date);
   const { reflection, setRating } = useReflection(date);
   const { toast, showToast, hideToast } = useToast();
@@ -111,6 +112,8 @@ export default function Timeline() {
     const focusFiltered = applyFocusFilter(source);
     const counts: Record<string, number> = {};
     for (const obs of focusFiltered) {
+      // Skip voice log containers — they use the fake 'transcript' category
+      if (obs.entry_type === 'voice' && obs.parent_observation_id === null) continue;
       counts[obs.category] = (counts[obs.category] ?? 0) + 1;
     }
     return Object.entries(counts)
@@ -138,11 +141,29 @@ export default function Timeline() {
     return filtered;
   }, [observations, activeCategories, searchQuery, applyFocusFilter]);
 
+  // Group voice children under their parent; voice parents become VoiceLogCards
+  const { voiceRenderList, voiceChildrenMap } = useMemo(() => {
+    const voiceChildrenMap = new Map<string, ObservationWithTags[]>();
+    for (const obs of filteredObservations) {
+      if (obs.entry_type === 'voice' && obs.parent_observation_id) {
+        const arr = voiceChildrenMap.get(obs.parent_observation_id) ?? [];
+        voiceChildrenMap.set(obs.parent_observation_id, [...arr, obs]);
+      }
+    }
+    // Drop standalone voice children — they are shown inside VoiceLogCard
+    const voiceRenderList = filteredObservations.filter(
+      (obs) => !(obs.entry_type === 'voice' && obs.parent_observation_id !== null)
+    );
+    return { voiceRenderList, voiceChildrenMap };
+  }, [filteredObservations]);
+
   const filteredWeekDays = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return weekDays.map((day) => ({
       ...day,
       observations: applyFocusFilter(day.observations).filter((o) => {
+        // Skip voice log containers in week view
+        if (o.entry_type === 'voice' && o.parent_observation_id === null) return false;
         if (activeCategories.size > 0 && !activeCategories.has(o.category)) return false;
         if (query) {
           const titleMatch = o.title?.toLowerCase().includes(query);
@@ -184,6 +205,14 @@ export default function Timeline() {
       undoAction: () => undoDelete(id),
     });
   }, [deleteObservation, showToast, undoDelete]);
+
+  const handleDeleteGroup = useCallback(async (ids: string[]) => {
+    await deleteObservationGroup(ids);
+    showToast('Voice log deleted', {
+      duration: 5000,
+      undoAction: () => undoDeleteGroup(ids),
+    });
+  }, [deleteObservationGroup, showToast, undoDeleteGroup]);
 
   const handleEditAssessment = useCallback(
     (assessment: AssessmentWithScale, tagName: string) => {
@@ -292,17 +321,33 @@ export default function Timeline() {
                 </span>
               </div>
             ) : (
-              filteredObservations.map((obs) => (
-                <TimelineCard
-                  key={obs.id}
-                  observation={obs}
-                  onDelete={handleDelete}
-                  onEditAssessment={handleEditAssessment}
-                  activeFocusAreas={activeFocusAreas}
-                  linkedAreaIds={linkedFocusAreaIds[obs.id] ?? []}
-                  onLinkPress={() => setLinkSheet({ obsId: obs.id })}
-                />
-              ))
+              voiceRenderList.map((obs) => {
+                const isVoiceParent =
+                  obs.entry_type === 'voice' &&
+                  obs.voice_log_id !== null &&
+                  obs.parent_observation_id === null;
+                if (isVoiceParent) {
+                  return (
+                    <VoiceLogCard
+                      key={obs.id}
+                      parent={obs}
+                      children={voiceChildrenMap.get(obs.id) ?? []}
+                      onDelete={handleDeleteGroup}
+                    />
+                  );
+                }
+                return (
+                  <TimelineCard
+                    key={obs.id}
+                    observation={obs}
+                    onDelete={handleDelete}
+                    onEditAssessment={handleEditAssessment}
+                    activeFocusAreas={activeFocusAreas}
+                    linkedAreaIds={linkedFocusAreaIds[obs.id] ?? []}
+                    onLinkPress={() => setLinkSheet({ obsId: obs.id })}
+                  />
+                );
+              })
             )}
             <ReflectionWidget reflection={reflection} onRate={setRating} />
           </>

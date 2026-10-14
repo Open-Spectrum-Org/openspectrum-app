@@ -4,6 +4,8 @@ import {
   getObservationsByDate,
   softDeleteObservation,
   undoDeleteObservation,
+  softDeleteObservations,
+  undoDeleteObservations,
 } from '../db/queries/observations';
 import type { ObservationWithTags } from '../types/database';
 
@@ -35,5 +37,15 @@ export function useObservations(date: string) {
     await refresh();
   }, [refresh]);
 
-  return { observations, loading, refresh, deleteObservation, undoDelete };
+  const deleteObservationGroup = useCallback(async (ids: string[]) => {
+    await softDeleteObservations(ids);
+    await refresh();
+  }, [refresh]);
+
+  const undoDeleteGroup = useCallback(async (ids: string[]) => {
+    await undoDeleteObservations(ids);
+    await refresh();
+  }, [refresh]);
+
+  return { observations, loading, refresh, deleteObservation, undoDelete, deleteObservationGroup, undoDeleteGroup };
 }

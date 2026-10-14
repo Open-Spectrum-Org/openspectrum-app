@@ -139,6 +139,24 @@ export async function undoDeleteObservation(observationId: string): Promise<void
   });
 }
 
+export async function softDeleteObservations(ids: string[]): Promise<void> {
+  const now = nowISO();
+  await db.transaction('rw', db.observations, async () => {
+    for (const id of ids) {
+      await db.observations.update(id, { is_deleted: 1, updated_at: now });
+    }
+  });
+}
+
+export async function undoDeleteObservations(ids: string[]): Promise<void> {
+  const now = nowISO();
+  await db.transaction('rw', db.observations, async () => {
+    for (const id of ids) {
+      await db.observations.update(id, { is_deleted: 0, updated_at: now });
+    }
+  });
+}
+
 export async function getObservationCategoryCountsByDateRange(
   childId: string,
   startDate: string,

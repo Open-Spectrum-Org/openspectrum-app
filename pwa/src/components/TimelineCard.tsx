@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { categoryColor } from '../theme/colors';
 import { formatTime } from '../utils/date';
 import type { FocusArea, ObservationWithTags, AssessmentWithScale } from '../types/database';
@@ -66,8 +65,6 @@ export function TimelineCard({
 }: TimelineCardProps) {
   const barColor = categoryColor(observation.category);
   const tagNames = observation.tags.map((t) => t.name).join(', ');
-  const isVoice = observation.entry_type === 'voice' && observation.notes;
-  const [showSummary, setShowSummary] = useState(false);
   const assessments = observation.assessments ?? [];
   const showLinkButton = (activeFocusAreas?.length ?? 0) > 0;
   const linkedCount = linkedAreaIds?.length ?? 0;
@@ -86,7 +83,7 @@ export function TimelineCard({
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="text-xs text-text-secondary flex-shrink-0 w-11">{displayTime(observation)}</span>
           <span className="text-sm font-medium text-text-primary truncate flex-1 min-w-0">
-            {showSummary ? observation.notes : tagLabel}
+            {tagLabel}
           </span>
           {assessments.length > 0 && (
             <div className="flex items-center gap-1 flex-shrink-0">
@@ -114,17 +111,9 @@ export function TimelineCard({
             <span className="text-xs text-text-muted">✕</span>
           </button>
         </div>
-        {/* Secondary row: notes / voice toggle / tags (only when present) */}
-        {isVoice ? (
-          <button onClick={() => setShowSummary((v) => !v)} className="mt-0.5">
-            <span className="text-xs text-primary font-medium">
-              {showSummary ? 'Show transcript' : 'Show AI summary'}
-            </span>
-          </button>
-        ) : (
-          observation.notes && (
-            <p className="text-xs text-text-secondary line-clamp-1 mt-0.5">{observation.notes}</p>
-          )
+        {/* Secondary row: notes / tags (only when present) */}
+        {observation.notes && (
+          <p className="text-xs text-text-secondary line-clamp-1 mt-0.5">{observation.notes}</p>
         )}
         {tagNames && observation.title && (
           <p className="text-xs text-text-muted truncate mt-0.5">{tagNames}</p>

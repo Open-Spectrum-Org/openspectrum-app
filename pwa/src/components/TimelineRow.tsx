@@ -18,6 +18,7 @@ export function TimelineRow({ observation, onTap }: TimelineRowProps) {
   const date = observation.occurred_at.split('T')[0]!;
   const tagNames = observation.tags.map((t) => t.name).join(', ');
   const label = observation.title ?? tagNames ?? observation.category;
+  const isVoiceChild = observation.entry_type === 'voice' && !!observation.parent_observation_id;
 
   const firstAssessment = observation.assessments?.[0];
   let badgeText: string | null = null;
@@ -44,6 +45,7 @@ export function TimelineRow({ observation, onTap }: TimelineRowProps) {
         <span className="capitalize" style={{ color }}>{observation.category}</span>
         {' · '}
         {label}
+        {isVoiceChild && <span className="opacity-40 ml-1">🎙️</span>}
       </span>
       {badgeText && (
         <span
