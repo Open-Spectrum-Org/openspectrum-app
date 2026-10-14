@@ -79,55 +79,55 @@ export function TimelineCard({
   }
 
   return (
-    <div className="flex bg-white rounded-[10px] mx-4 my-1 shadow-sm overflow-hidden">
-      <div className="w-1" style={{ backgroundColor: barColor }} />
-      <div className="flex-1 p-3 space-y-1">
-        <div className="flex justify-between items-center">
-          <span className="text-xs text-text-secondary">{displayTime(observation)}</span>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold capitalize" style={{ color: barColor }}>
-              {observation.category}
-            </span>
-            {showLinkButton && (
-              <button onClick={onLinkPress} className="p-1">
-                <span className="text-xs text-text-muted">🎯</span>
-              </button>
-            )}
-            <button
-              onClick={() => onDelete(observation.id)}
-              className="p-1"
-            >
-              <span className="text-xs text-text-muted">✕</span>
+    <div className="flex bg-white rounded-[8px] mx-4 my-0.5 shadow-sm overflow-hidden">
+      <div className="w-1 flex-shrink-0" style={{ backgroundColor: barColor }} />
+      <div className="flex-1 px-2 py-1.5 min-w-0">
+        {/* Main row: time · label · assessments · category · actions */}
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-xs text-text-secondary flex-shrink-0 w-11">{displayTime(observation)}</span>
+          <span className="text-sm font-medium text-text-primary truncate flex-1 min-w-0">
+            {showSummary ? observation.notes : tagLabel}
+          </span>
+          {assessments.length > 0 && (
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {assessments.map((a) => (
+                <AssessmentBadge
+                  key={a.id}
+                  a={a}
+                  onEdit={onEditAssessment ? handleEditAssessment : undefined}
+                />
+              ))}
+            </div>
+          )}
+          <span className="text-xs font-medium capitalize flex-shrink-0" style={{ color: barColor }}>
+            {observation.category}
+          </span>
+          {showLinkButton && (
+            <button onClick={onLinkPress} className="flex-shrink-0 p-0.5 leading-none">
+              <span className="text-xs text-text-muted">🎯</span>
             </button>
-          </div>
+          )}
+          <button
+            onClick={() => onDelete(observation.id)}
+            className="flex-shrink-0 p-0.5 leading-none"
+          >
+            <span className="text-xs text-text-muted">✕</span>
+          </button>
         </div>
-        <p className="text-base font-semibold text-text-primary">
-          {showSummary ? observation.notes : tagLabel}
-        </p>
+        {/* Secondary row: notes / voice toggle / tags (only when present) */}
         {isVoice ? (
-          <button onClick={() => setShowSummary((v) => !v)} className="self-start py-0.5">
+          <button onClick={() => setShowSummary((v) => !v)} className="mt-0.5">
             <span className="text-xs text-primary font-medium">
               {showSummary ? 'Show transcript' : 'Show AI summary'}
             </span>
           </button>
         ) : (
           observation.notes && (
-            <p className="text-sm text-text-secondary line-clamp-2">{observation.notes}</p>
+            <p className="text-xs text-text-secondary line-clamp-1 mt-0.5">{observation.notes}</p>
           )
         )}
         {tagNames && observation.title && (
-          <p className="text-xs text-text-muted">{tagNames}</p>
-        )}
-        {assessments.length > 0 && (
-          <div className="flex flex-wrap gap-1 pt-0.5">
-            {assessments.map((a) => (
-              <AssessmentBadge
-                key={a.id}
-                a={a}
-                onEdit={onEditAssessment ? handleEditAssessment : undefined}
-              />
-            ))}
-          </div>
+          <p className="text-xs text-text-muted truncate mt-0.5">{tagNames}</p>
         )}
         {linkedCount > 0 && (
           <span className="text-xs text-text-muted">
