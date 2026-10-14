@@ -25,9 +25,9 @@ export function VoiceLogCard({ parent, children, onDelete }: VoiceLogCardProps) 
   const allIds = [parent.id, ...children.map((c) => c.id)];
 
   return (
-    <div className="flex bg-white rounded-[8px] mx-4 my-0.5 shadow-sm overflow-hidden">
+    <div className="flex w-full active:bg-surface border-b border-gray-100">
       <div className="w-1 flex-shrink-0 bg-gray-300" />
-      <div className="flex-1 px-2 py-1.5 min-w-0">
+      <div className="flex-1 px-3 py-1.5 min-w-0">
         {/* Main row: mic · time · text · delete */}
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="text-xs flex-shrink-0 opacity-50">🎙️</span>

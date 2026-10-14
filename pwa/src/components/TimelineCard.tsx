@@ -76,9 +76,9 @@ export function TimelineCard({
   }
 
   return (
-    <div className="flex bg-white rounded-[8px] mx-4 my-0.5 shadow-sm overflow-hidden">
+    <div className="flex w-full active:bg-surface border-b border-gray-100">
       <div className="w-1 flex-shrink-0" style={{ backgroundColor: barColor }} />
-      <div className="flex-1 px-2 py-1.5 min-w-0">
+      <div className="flex-1 px-3 py-1.5 min-w-0">
         {/* Main row: time · label · assessments · category · actions */}
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="text-xs text-text-secondary flex-shrink-0 w-11">{displayTime(observation)}</span>
