@@ -6,6 +6,7 @@ import type { FocusArea, ObservationWithTags, AssessmentWithScale } from '../typ
 interface TimelineCardProps {
   observation: ObservationWithTags;
   onDelete: (id: string) => void;
+  onEditAssessment?: (assessment: AssessmentWithScale, tagName: string) => void;
   activeFocusAreas?: FocusArea[];
   linkedAreaIds?: string[];
   onLinkPress?: () => void;
@@ -17,25 +18,52 @@ function displayTime(obs: ObservationWithTags): string {
   return formatTime(obs.occurred_at);
 }
 
-function AssessmentBadge({ a }: { a: AssessmentWithScale }) {
+function AssessmentBadge({
+  a,
+  onEdit,
+}: {
+  a: AssessmentWithScale;
+  onEdit?: (a: AssessmentWithScale) => void;
+}) {
   const { scale, numeric_value, categorical_value } = a;
+
+  let label = '';
   if (scale.scale_type === 'numeric' && numeric_value !== null) {
-    const label = `${scale.name} ${numeric_value}${scale.max_value != null ? `/${scale.max_value}` : ''}`;
+    label = `${scale.name} ${numeric_value}${scale.max_value != null ? `/${scale.max_value}` : ''}`;
+  } else if (categorical_value) {
+    label = `${scale.name}: ${categorical_value}`;
+  } else {
+    return null;
+  }
+
+  const baseClass =
+    scale.scale_type === 'numeric'
+      ? 'text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full'
+      : 'text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full';
+
+  if (onEdit) {
     return (
-      <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{label}</span>
+      <button
+        onClick={() => onEdit(a)}
+        className={`${baseClass} active:opacity-70 active:scale-95 transition-transform inline-flex items-center gap-1`}
+      >
+        {label}
+        <span className="opacity-40 text-[9px]">✎</span>
+      </button>
     );
   }
-  if (categorical_value) {
-    return (
-      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-        {scale.name}: {categorical_value}
-      </span>
-    );
-  }
-  return null;
+
+  return <span className={baseClass}>{label}</span>;
 }
 
-export function TimelineCard({ observation, onDelete, activeFocusAreas, linkedAreaIds, onLinkPress }: TimelineCardProps) {
+export function TimelineCard({
+  observation,
+  onDelete,
+  onEditAssessment,
+  activeFocusAreas,
+  linkedAreaIds,
+  onLinkPress,
+}: TimelineCardProps) {
   const barColor = categoryColor(observation.category);
   const tagNames = observation.tags.map((t) => t.name).join(', ');
   const isVoice = observation.entry_type === 'voice' && observation.notes;
@@ -43,6 +71,12 @@ export function TimelineCard({ observation, onDelete, activeFocusAreas, linkedAr
   const assessments = observation.assessments ?? [];
   const showLinkButton = (activeFocusAreas?.length ?? 0) > 0;
   const linkedCount = linkedAreaIds?.length ?? 0;
+
+  const tagLabel = observation.title ?? tagNames;
+
+  function handleEditAssessment(a: AssessmentWithScale) {
+    onEditAssessment?.(a, tagLabel);
+  }
 
   return (
     <div className="flex bg-white rounded-[10px] mx-4 my-1 shadow-sm overflow-hidden">
@@ -68,7 +102,7 @@ export function TimelineCard({ observation, onDelete, activeFocusAreas, linkedAr
           </div>
         </div>
         <p className="text-base font-semibold text-text-primary">
-          {showSummary ? observation.notes : (observation.title ?? tagNames)}
+          {showSummary ? observation.notes : tagLabel}
         </p>
         {isVoice ? (
           <button onClick={() => setShowSummary((v) => !v)} className="self-start py-0.5">
@@ -87,7 +121,11 @@ export function TimelineCard({ observation, onDelete, activeFocusAreas, linkedAr
         {assessments.length > 0 && (
           <div className="flex flex-wrap gap-1 pt-0.5">
             {assessments.map((a) => (
-              <AssessmentBadge key={a.id} a={a} />
+              <AssessmentBadge
+                key={a.id}
+                a={a}
+                onEdit={onEditAssessment ? handleEditAssessment : undefined}
+              />
             ))}
           </div>
         )}

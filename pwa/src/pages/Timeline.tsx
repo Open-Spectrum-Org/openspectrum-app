@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { AppHeader } from '../components/AppHeader';
 import { DateNavigator } from '../components/DateNavigator';
 import { DaySummaryRow } from '../components/DaySummaryRow';
+import { AssessmentSheet } from '../components/AssessmentSheet';
 import { FocusLinkSheet } from '../components/FocusLinkSheet';
 import { TimelineCard } from '../components/TimelineCard';
 import { TimelineRow } from '../components/TimelineRow';
@@ -21,7 +22,7 @@ import {
   linkObservationToFocusArea,
   unlinkObservationFromFocusArea,
 } from '../db/queries/focusAreas';
-import type { FocusArea, ObservationWithTags } from '../types/database';
+import type { AssessmentWithScale, FocusArea, ObservationWithTags } from '../types/database';
 
 type ViewMode = 'day' | 'week';
 
@@ -53,8 +54,12 @@ export default function Timeline() {
 
   const [linkedFocusAreaIds, setLinkedFocusAreaIds] = useState<Record<string, string[]>>({});
   const [linkSheet, setLinkSheet] = useState<{ obsId: string } | null>(null);
+  const [editingAssessment, setEditingAssessment] = useState<{
+    assessment: AssessmentWithScale;
+    tagName: string;
+  } | null>(null);
 
-  const { observations, deleteObservation, undoDelete } = useObservations(date);
+  const { observations, refresh, deleteObservation, undoDelete } = useObservations(date);
   const { days: weekDays } = useWeekObservations(date);
   const { reflection, setRating } = useReflection(date);
   const { toast, showToast, hideToast } = useToast();
@@ -180,6 +185,18 @@ export default function Timeline() {
     });
   }, [deleteObservation, showToast, undoDelete]);
 
+  const handleEditAssessment = useCallback(
+    (assessment: AssessmentWithScale, tagName: string) => {
+      setEditingAssessment({ assessment, tagName });
+    },
+    []
+  );
+
+  const handleCloseEditAssessment = useCallback(() => {
+    setEditingAssessment(null);
+    refresh();
+  }, [refresh]);
+
   const handleWeekRowTap = useCallback((tapDate: string) => {
     setDate(tapDate);
     setViewMode('day');
@@ -280,6 +297,7 @@ export default function Timeline() {
                   key={obs.id}
                   observation={obs}
                   onDelete={handleDelete}
+                  onEditAssessment={handleEditAssessment}
                   activeFocusAreas={activeFocusAreas}
                   linkedAreaIds={linkedFocusAreaIds[obs.id] ?? []}
                   onLinkPress={() => setLinkSheet({ obsId: obs.id })}
@@ -391,6 +409,18 @@ export default function Timeline() {
           onLink={handleLink}
           onUnlink={handleUnlink}
           onClose={() => setLinkSheet(null)}
+        />
+      )}
+      {editingAssessment && (
+        <AssessmentSheet
+          visible={true}
+          observationId={editingAssessment.assessment.observation_id}
+          tagName={editingAssessment.tagName}
+          scale={editingAssessment.assessment.scale}
+          existingAssessmentId={editingAssessment.assessment.id}
+          currentNumericValue={editingAssessment.assessment.numeric_value}
+          currentCategoricalValue={editingAssessment.assessment.categorical_value}
+          onClose={handleCloseEditAssessment}
         />
       )}
     </div>

@@ -75,6 +75,21 @@ export async function insertObservationAssessment(
   return id;
 }
 
+export async function updateObservationAssessment(
+  assessmentId: string,
+  values: {
+    numeric_value?: number | null;
+    categorical_value?: string | null;
+    comparative_value?: 'better' | 'same' | 'worse' | null;
+  }
+): Promise<void> {
+  await db.observation_assessments.update(assessmentId, {
+    numeric_value: values.numeric_value ?? null,
+    categorical_value: values.categorical_value ?? null,
+    ...(values.comparative_value !== undefined && { comparative_value: values.comparative_value }),
+  });
+}
+
 export async function deleteObservationAssessment(assessmentId: string): Promise<void> {
   await db.observation_assessments.delete(assessmentId);
 }
