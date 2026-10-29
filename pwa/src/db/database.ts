@@ -1,7 +1,7 @@
 import Dexie, { type EntityTable, type Table } from 'dexie';
 import { SYSTEM_SCALES } from './seed';
 import { generateUUID } from '../utils/uuid';
-import { nowISO } from '../utils/date';
+import { nowISO, dayStartISO } from '../utils/date';
 import type {
   User,
   Family,
@@ -161,6 +161,17 @@ class OpenSpectrumDB extends Dexie {
         version: 1,
       }));
       await tx.table('assessment_scales').bulkPut(scaleDefs);
+    });
+
+    // v4: date-only entries were stored as bare 'YYYY-MM-DD', which day-range
+    // queries never matched. Store them as the start of that local day instead.
+    this.version(4).upgrade(async (tx) => {
+      await tx
+        .table('observations')
+        .filter((obs) => typeof obs.occurred_at === 'string' && obs.occurred_at.length === 10)
+        .modify((obs) => {
+          obs.occurred_at = dayStartISO(obs.occurred_at);
+        });
     });
   }
 }

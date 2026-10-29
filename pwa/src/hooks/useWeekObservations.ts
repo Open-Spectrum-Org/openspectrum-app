@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useChild } from './useChild';
 import { getObservationsByDateRange } from '../db/queries/observations';
-import { addDays } from '../utils/date';
+import { addDays, isoToLocalDate } from '../utils/date';
 import type { ObservationWithTags } from '../types/database';
 
 export interface DayData {
@@ -24,7 +24,7 @@ export function useWeekObservations(endDate: string) {
     // Group by date (extract date portion of occurred_at)
     const byDate: Record<string, ObservationWithTags[]> = {};
     for (const obs of allObs) {
-      const d = obs.occurred_at.split('T')[0]!;
+      const d = isoToLocalDate(obs.occurred_at);
       if (!byDate[d]) byDate[d] = [];
       byDate[d]!.push(obs);
     }

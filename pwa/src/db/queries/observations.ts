@@ -1,6 +1,6 @@
 import { db } from '../database';
 import { generateUUID } from '../../utils/uuid';
-import { nowISO } from '../../utils/date';
+import { nowISO, dayStartISO, dayEndISO } from '../../utils/date';
 import { getAssessmentsForObservations } from './assessments';
 import type { ObservationWithTags, TagDefinition, DaySummary, Observation } from '../../types/database';
 
@@ -94,8 +94,8 @@ export async function getObservationsByDate(
   childId: string,
   date: string
 ): Promise<ObservationWithTags[]> {
-  const startOfDay = `${date}T00:00:00.000Z`;
-  const endOfDay = `${date}T23:59:59.999Z`;
+  const startOfDay = dayStartISO(date);
+  const endOfDay = dayEndISO(date);
 
   const observations = await db.observations
     .where('[child_id+occurred_at]')
@@ -112,8 +112,8 @@ export async function getObservationsByDateRange(
   startDate: string,
   endDate: string
 ): Promise<ObservationWithTags[]> {
-  const start = `${startDate}T00:00:00.000Z`;
-  const end = `${endDate}T23:59:59.999Z`;
+  const start = dayStartISO(startDate);
+  const end = dayEndISO(endDate);
 
   const observations = await db.observations
     .where('[child_id+occurred_at]')
@@ -162,8 +162,8 @@ export async function getObservationCategoryCountsByDateRange(
   startDate: string,
   endDate: string
 ): Promise<Record<string, number>> {
-  const start = `${startDate}T00:00:00.000Z`;
-  const end = `${endDate}T23:59:59.999Z`;
+  const start = dayStartISO(startDate);
+  const end = dayEndISO(endDate);
 
   const observations = await db.observations
     .where('[child_id+occurred_at]')
@@ -179,8 +179,8 @@ export async function getObservationCategoryCountsByDateRange(
 }
 
 export async function getDaySummary(childId: string, date: string): Promise<DaySummary> {
-  const startOfDay = `${date}T00:00:00.000Z`;
-  const endOfDay = `${date}T23:59:59.999Z`;
+  const startOfDay = dayStartISO(date);
+  const endOfDay = dayEndISO(date);
 
   const observations = await db.observations
     .where('[child_id+occurred_at]')

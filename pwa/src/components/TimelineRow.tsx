@@ -1,5 +1,5 @@
 import { categoryColor } from '../theme/colors';
-import { formatTime } from '../utils/date';
+import { formatTime, isoToLocalDate } from '../utils/date';
 import type { ObservationWithTags } from '../types/database';
 
 interface TimelineRowProps {
@@ -15,7 +15,7 @@ function displayTime(obs: ObservationWithTags): string {
 
 export function TimelineRow({ observation, onTap }: TimelineRowProps) {
   const color = categoryColor(observation.category);
-  const date = observation.occurred_at.split('T')[0]!;
+  const date = isoToLocalDate(observation.occurred_at);
   const tagNames = observation.tags.map((t) => t.name).join(', ');
   const label = observation.title ?? tagNames ?? observation.category;
   const isVoiceChild = observation.entry_type === 'voice' && !!observation.parent_observation_id;

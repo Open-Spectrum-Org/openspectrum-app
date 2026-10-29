@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { dayStartISO, localDateString, todayDateString } from '../utils/date';
 
 export interface TimeSelection {
   occurredAt: string | null; // null = use nowISO() at tap time
@@ -44,7 +45,7 @@ const CHIPS: ChipDef[] = [
   {
     label: 'Earlier today',
     getSelection: () => ({
-      occurredAt: new Date().toISOString().split('T')[0]!,
+      occurredAt: dayStartISO(todayDateString()),
       precision: 'date_only',
     }),
   },
@@ -53,7 +54,7 @@ const CHIPS: ChipDef[] = [
     getSelection: () => {
       const d = new Date();
       d.setDate(d.getDate() - 1);
-      return { occurredAt: d.toISOString().split('T')[0]!, precision: 'date_only' };
+      return { occurredAt: dayStartISO(localDateString(d)), precision: 'date_only' };
     },
   },
 ];

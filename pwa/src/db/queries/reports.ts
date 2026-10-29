@@ -1,5 +1,6 @@
 import { db } from '../database';
 import type { AssessmentScale } from '../../types/database';
+import { dayStartISO, dayEndISO, isoToLocalDate } from '../../utils/date';
 
 export interface CategoryCount {
   category: string;
@@ -39,8 +40,8 @@ export async function getCategoryBreakdown(
   endDate: string,
   categories?: string[]
 ): Promise<CategoryCount[]> {
-  const start = `${startDate}T00:00:00.000Z`;
-  const end = `${endDate}T23:59:59.999Z`;
+  const start = dayStartISO(startDate);
+  const end = dayEndISO(endDate);
 
   const obs = await db.observations
     .where('[child_id+occurred_at]')
@@ -65,8 +66,8 @@ export async function getDailyCounts(
   endDate: string,
   categories?: string[]
 ): Promise<DailyCount[]> {
-  const start = `${startDate}T00:00:00.000Z`;
-  const end = `${endDate}T23:59:59.999Z`;
+  const start = dayStartISO(startDate);
+  const end = dayEndISO(endDate);
 
   const obs = await db.observations
     .where('[child_id+occurred_at]')
@@ -76,7 +77,7 @@ export async function getDailyCounts(
 
   const counts = new Map<string, number>();
   for (const o of obs) {
-    const date = o.occurred_at.split('T')[0]!;
+    const date = isoToLocalDate(o.occurred_at);
     counts.set(date, (counts.get(date) ?? 0) + 1);
   }
 
@@ -93,8 +94,8 @@ export async function getTopTags(
   limit = 10,
   categories?: string[]
 ): Promise<TagCount[]> {
-  const start = `${startDate}T00:00:00.000Z`;
-  const end = `${endDate}T23:59:59.999Z`;
+  const start = dayStartISO(startDate);
+  const end = dayEndISO(endDate);
 
   const obs = await db.observations
     .where('[child_id+occurred_at]')
@@ -133,8 +134,8 @@ export async function getTotalCount(
   endDate: string,
   categories?: string[]
 ): Promise<number> {
-  const start = `${startDate}T00:00:00.000Z`;
-  const end = `${endDate}T23:59:59.999Z`;
+  const start = dayStartISO(startDate);
+  const end = dayEndISO(endDate);
 
   return db.observations
     .where('[child_id+occurred_at]')
@@ -150,8 +151,8 @@ export async function getHourlyDistribution(
   endDate: string,
   categories?: string[]
 ): Promise<HourCount[]> {
-  const start = `${startDate}T00:00:00.000Z`;
-  const end = `${endDate}T23:59:59.999Z`;
+  const start = dayStartISO(startDate);
+  const end = dayEndISO(endDate);
 
   const obs = await db.observations
     .where('[child_id+occurred_at]')
@@ -203,8 +204,8 @@ export async function getReflectionCorrelation(
   startDate: string,
   endDate: string
 ): Promise<CategoryReflectionCorrelation[]> {
-  const start = `${startDate}T00:00:00.000Z`;
-  const end = `${endDate}T23:59:59.999Z`;
+  const start = dayStartISO(startDate);
+  const end = dayEndISO(endDate);
 
   // Get daily observation counts
   const obs = await db.observations
@@ -215,7 +216,7 @@ export async function getReflectionCorrelation(
 
   const dailyObsCounts = new Map<string, number>();
   for (const o of obs) {
-    const date = o.occurred_at.split('T')[0]!;
+    const date = isoToLocalDate(o.occurred_at);
     dailyObsCounts.set(date, (dailyObsCounts.get(date) ?? 0) + 1);
   }
 
@@ -266,8 +267,8 @@ export async function getAssessmentAverages(
   endDate: string,
   categories?: string[]
 ): Promise<AssessmentAverage[]> {
-  const start = `${startDate}T00:00:00.000Z`;
-  const end = `${endDate}T23:59:59.999Z`;
+  const start = dayStartISO(startDate);
+  const end = dayEndISO(endDate);
 
   const obs = await db.observations
     .where('[child_id+occurred_at]')
@@ -348,8 +349,8 @@ export async function getDayOfWeekPattern(
   endDate: string,
   categories?: string[]
 ): Promise<DayOfWeekCount[]> {
-  const start = `${startDate}T00:00:00.000Z`;
-  const end = `${endDate}T23:59:59.999Z`;
+  const start = dayStartISO(startDate);
+  const end = dayEndISO(endDate);
 
   const obs = await db.observations
     .where('[child_id+occurred_at]')

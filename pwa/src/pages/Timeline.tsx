@@ -15,7 +15,7 @@ import { useWeekObservations } from '../hooks/useWeekObservations';
 import { useReflection } from '../hooks/useReflection';
 import { useToast } from '../hooks/useToast';
 import { useFocusAreas } from '../hooks/useFocusAreas';
-import { todayDateString, addDays, formatDateDisplay, isToday } from '../utils/date';
+import { todayDateString, addDays, formatDateDisplay, isToday, dayStartISO } from '../utils/date';
 import { categoryColor } from '../theme/colors';
 import { tagMatchesQuery } from '../utils/tagSynonyms';
 import {
@@ -430,7 +430,7 @@ export default function Timeline() {
             </button>
             <button
               onClick={() => {
-                navigate('/', { state: { historicalDate: date, occurredAt: date, precision: 'date_only' } });
+                navigate('/', { state: { historicalDate: date, occurredAt: dayStartISO(date), precision: 'date_only' } });
                 setShowTimePicker(false);
               }}
               className="w-full text-text-secondary text-sm py-2"
