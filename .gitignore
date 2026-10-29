@@ -40,3 +40,22 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Windows download markers (WSL)
+*:Zone.Identifier
+
+# local working docs (not for the repo)
+/docs/00_hypotheses_bank_slide.html
+/docs/01_validation_loop_schematic.html
+/docs/02_deliverables_strategy_slide.html
+/docs/03 openspectrum_conceptual_architecture_dashboard.html
+/docs/1 OpenSpectrum Data Model - 14 Domains Overview.pptx
+/docs/15 Hypothesis.jpg
+/docs/2 OpenSpectrum Data Model - Attribute Catalog Architecture.pptx
+/docs/3 OpenSpectrum Data Model - Event Attributes Example.pptx
+/docs/4 OpenSpectrum Data Model - Capture Experience & Semantic Classification.pptx
+/docs/5 OpenSpectrum Data Model - Design Rules & Validation Invariants.pptx
+/docs/Data-Model.md
+/docs/Hypothesis-Driven-Data-Model.md
+/docs/OSDM_Concepts_and_Taxonomy_v0.1.md
+/docs/OpenSpectrum_Aarav_2026-09-16_2026-10-15.csv
