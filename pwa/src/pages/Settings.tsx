@@ -48,7 +48,7 @@ export default function Settings() {
         <div className="space-y-2">
           <h2 className="text-xl font-semibold text-text-primary">Demo Data</h2>
           <p className="text-sm text-text-muted">
-            Adds two weeks of sample logs to a patient named {DEMO_CHILD_NAME}. Other patients are not touched.
+            Adds four weeks of sample logs to a patient named {DEMO_CHILD_NAME}. Other patients are not touched.
           </p>
           <div className="flex gap-3">
             <button

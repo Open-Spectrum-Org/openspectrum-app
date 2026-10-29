@@ -7,7 +7,12 @@ import type { Observation, DailyReflection } from '../types/database';
 // Demo rows are marked with this device_id so they can be removed cleanly.
 const DEMO_DEVICE_ID = 'demo-seed';
 export const DEMO_CHILD_NAME = 'Adam';
-const DAYS_BACK = 14;
+const DAYS_BACK = 28;
+// The story: a visual schedule for after-school was introduced this many days ago.
+const INTERVENTION_DAYS_AGO = 14;
+const MISSED_MED_DAYS = [19, 5];
+// Poor nights: frequent before the visual schedule, rarer after. Yesterday is one, for the Timeline story.
+const POOR_SLEEP_DAYS = [27, 25, 24, 21, 18, 16, 11, 1];
 
 // Small seeded RNG so the generated history is the same every time.
 function mulberry32(seed: number) {
@@ -40,7 +45,7 @@ interface DemoVoice {
 
 // Voice notes placed on specific days (days ago → note).
 const VOICE_NOTES: Record<number, DemoVoice> = {
-  12: {
+  26: {
     hour: 16,
     transcript: "Pickup from school was rough. He covered his ears in the car line and cried most of the way home. Calmed down after a snack.",
     summary: 'Difficult school pickup with noise sensitivity, calmed after snack',
@@ -50,9 +55,18 @@ const VOICE_NOTES: Record<number, DemoVoice> = {
       { category: 'behavior', title: 'Crying on the way home', tag: 'Crying' },
     ],
   },
+  [INTERVENTION_DAYS_AGO]: {
+    hour: 16.25,
+    transcript: "We started a visual schedule for after school today. He checked it when he got home and moved to snack and homework without a fuss.",
+    summary: 'Started after-school visual schedule; smooth transition home',
+    items: [
+      { category: 'successes', title: 'Followed new visual schedule', tag: 'Success Moment' },
+      { category: 'transitions', title: 'Smooth transition after school', tag: 'Good Transition' },
+    ],
+  },
   9: {
-    hour: 10.5,
-    transcript: 'Great morning at the park. He took turns on the slide with another kid without any prompting.',
+    hour: 13.5,
+    transcript: 'Great afternoon at the park. He took turns on the slide with another kid without any prompting.',
     summary: 'Played well at the park and took turns independently',
     items: [
       { category: 'successes', title: 'Took turns on the slide', tag: 'Success Moment' },
@@ -60,11 +74,11 @@ const VOICE_NOTES: Record<number, DemoVoice> = {
     ],
   },
   5: {
-    hour: 18.5,
-    transcript: "Forgot his evening medication until late, and he's been really irritable and couldn't settle for dinner.",
-    summary: 'Late medication, irritable and skipped dinner',
+    hour: 18.25,
+    transcript: "Forgot his morning medication, and he's been really irritable since pickup and couldn't settle for dinner.",
+    summary: 'Missed medication, irritable and skipped dinner',
     items: [
-      { category: 'medication', title: 'Evening dose missed', tag: 'Missed' },
+      { category: 'medication', title: 'Morning dose missed', tag: 'Missed' },
       { category: 'emotion', title: 'Irritable before dinner', tag: 'Irritated' },
       { category: 'food', title: 'Refused dinner', tag: 'Refused Food' },
     ],
@@ -80,66 +94,78 @@ const VOICE_NOTES: Record<number, DemoVoice> = {
   },
 };
 
+// One day of logs. Patterns built in on purpose, so Reports has a story to tell:
+// - poor sleep or missed meds → a hard afternoon (meltdown) and a "difficult" rating
+// - school days are busier than weekends, with most events after school
+// - after the visual schedule starts, sleep and afternoons improve
 function buildDay(daysAgo: number, weekday: number, rand: () => number): { events: DemoEvent[]; rating: DailyReflection['rating'] } {
+  const improved = daysAgo <= INTERVENTION_DAYS_AGO;
   const isSchoolDay = weekday >= 1 && weekday <= 5;
-  const poorSleep = rand() < 0.3;
-  const missedMeds = daysAgo === 5 || daysAgo === 11;
+  const poorSleep = POOR_SLEEP_DAYS.includes(daysAgo);
+  const missedMeds = MISSED_MED_DAYS.includes(daysAgo);
+  const hardDay = poorSleep || missedMeds;
   const events: DemoEvent[] = [];
   const pick = <T,>(arr: T[]) => arr[Math.floor(rand() * arr.length)]!;
 
+  // Morning
   events.push(
     poorSleep
       ? { hour: 7, category: 'sleep', tag: 'Poor Sleep', sleepQuality: pick([1, 2]) }
       : { hour: 7, category: 'sleep', tag: 'Slept Well', sleepQuality: pick([4, 5]) }
   );
-
   if (!missedMeds) {
-    events.push({ hour: 7.75, category: 'medication', tag: 'Taken', medEffect: pick(['better', 'no_change', 'no_change']) });
+    events.push({ hour: 7.75, category: 'medication', tag: 'Taken', medEffect: improved ? pick(['better', 'better', 'no_change']) : pick(['better', 'no_change', 'no_change']) });
+  }
+  if (rand() < 0.5) {
+    events.push(
+      hardDay
+        ? { hour: 8, category: 'food', tag: 'Refused Food', foodReaction: 'neutral' }
+        : { hour: 8, category: 'food', tag: 'Ate Well', foodReaction: 'positive' }
+    );
   }
 
-  events.push(
-    rand() < 0.75
-      ? { hour: 8, category: 'food', tag: 'Ate Well', foodReaction: 'positive' }
-      : { hour: 8, category: 'food', tag: 'Refused Food', foodReaction: 'neutral' }
-  );
-
-  let hardDay = poorSleep || missedMeds;
-
   if (isSchoolDay) {
-    if (hardDay || rand() < 0.35) {
+    // After school
+    if (rand() < 0.6) {
+      events.push({ hour: 15.25, category: 'food', tag: pick(['Ate Well', 'Sugar']), foodReaction: 'neutral' });
+    }
+    if (hardDay) {
       events.push({ hour: 15.5, category: 'transitions', tag: 'Difficult Transition' });
       events.push({ hour: 15.6, category: 'trigger', tag: pick(['School', 'Noise', 'Transition']) });
-      if (hardDay && rand() < 0.7) {
-        events.push({ hour: 16, category: 'behavior', tag: 'Meltdown', severity: pick([3, 4]), mood: 2 });
-        hardDay = true;
-      } else {
-        events.push({ hour: 16, category: 'emotion', tag: 'Tired', mood: 3 });
+      if (rand() < 0.85) {
+        events.push({ hour: 15.9, category: 'behavior', tag: 'Meltdown', severity: pick([3, 4, 4]), mood: pick([1, 2]) });
       }
+      if (rand() < 0.5) events.push({ hour: 16.4, category: 'behavior', tag: pick(['Crying', 'Anxious']), severity: 2, mood: 2 });
+      if (rand() < 0.3) events.push({ hour: 16.7, category: 'sensory', tag: 'Sensory Overload' });
+      if (rand() < 0.5) events.push({ hour: 17.5, category: 'food', tag: 'Refused Food', foodReaction: 'adverse' });
+      events.push({ hour: 18.25, category: 'emotion', tag: pick(['Irritated', 'Overwhelmed']), mood: 2 });
+    } else if (!improved && rand() < 0.4) {
+      events.push({ hour: 15.5, category: 'transitions', tag: 'Difficult Transition' });
+      events.push({ hour: 16, category: 'emotion', tag: 'Tired', mood: 3 });
     } else {
       events.push({ hour: 15.5, category: 'transitions', tag: 'Good Transition' });
       events.push({ hour: 16.5, category: 'behavior', tag: pick(['Calm', 'Focused']), mood: 4 });
+      if (rand() < (improved ? 0.5 : 0.15)) events.push({ hour: 17, category: 'successes', tag: 'Success Moment' });
     }
   } else {
-    events.push({ hour: 10, category: 'emotion', tag: 'Happy', mood: pick([4, 5]) });
-    if (rand() < 0.5) {
-      events.push({ hour: 12.5, category: 'sensory', tag: 'Sensory Overload' });
-      events.push({ hour: 12.6, category: 'trigger', tag: 'Social Situation' });
-      events.push({ hour: 13, category: 'behavior', tag: 'Stim', severity: 2, mood: 3 });
-    } else {
-      events.push({ hour: 14, category: 'successes', tag: 'Success Moment' });
+    // Weekend: quieter, with an outing after lunch
+    events.push({ hour: 13, category: 'emotion', tag: hardDay ? 'Irritated' : 'Happy', mood: hardDay ? 2 : pick([4, 5]) });
+    if (rand() < 0.35) {
+      events.push({ hour: 14.5, category: 'sensory', tag: 'Sensory Overload' });
+      events.push({ hour: 14.6, category: 'trigger', tag: 'Social Situation' });
+    } else if (rand() < (improved ? 0.6 : 0.3)) {
+      events.push({ hour: 15, category: 'successes', tag: 'Success Moment' });
     }
   }
 
-  if (rand() < 0.4) {
-    events.push({ hour: 17.5, category: 'food', tag: 'Sugar', foodReaction: hardDay ? 'adverse' : 'neutral' });
-  }
-  if (hardDay && rand() < 0.5) {
-    events.push({ hour: 18.5, category: 'emotion', tag: pick(['Irritated', 'Overwhelmed']), mood: 2 });
-  } else if (rand() < 0.5) {
+  if (!hardDay && rand() < 0.4) {
     events.push({ hour: 18.5, category: 'behavior', tag: 'Calm', mood: 4 });
   }
 
-  const rating: DailyReflection['rating'] = hardDay ? 'difficult' : rand() < 0.35 ? 'better_than_usual' : 'typical';
+  let rating: DailyReflection['rating'];
+  if (hardDay) rating = rand() < 0.9 ? 'difficult' : 'typical';
+  else if (!improved && rand() < 0.1) rating = 'difficult';
+  else rating = rand() < (improved ? 0.45 : 0.25) ? 'better_than_usual' : 'typical';
   return { events, rating };
 }
 
