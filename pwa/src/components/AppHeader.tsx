@@ -27,29 +27,28 @@ export function AppHeader({
           <span className="text-lg">🏠</span>
         </button>
       )}
-      <div
-        className={`flex-1 flex items-center bg-surface-alt rounded-[10px] px-2 h-9 ${
-          !editable ? 'opacity-50' : ''
-        }`}
-      >
-        <span className="text-sm mr-1">🔍</span>
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder={placeholder}
-          disabled={!editable}
-          className="flex-1 bg-transparent text-base text-text-primary outline-none placeholder:text-text-muted"
-        />
-        {searchQuery.length > 0 && editable && (
-          <button
-            onClick={() => onSearchChange('')}
-            className="w-6 h-6 flex items-center justify-center"
-          >
-            <span className="text-sm text-text-secondary">✕</span>
-          </button>
-        )}
-      </div>
+      {editable ? (
+        <div className="flex-1 flex items-center bg-surface-alt rounded-[10px] px-2 h-9">
+          <span className="text-sm mr-1">🔍</span>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder={placeholder}
+            className="flex-1 bg-transparent text-base text-text-primary outline-none placeholder:text-text-muted"
+          />
+          {searchQuery.length > 0 && (
+            <button
+              onClick={() => onSearchChange('')}
+              className="w-6 h-6 flex items-center justify-center"
+            >
+              <span className="text-sm text-text-secondary">✕</span>
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="flex-1 h-9" />
+      )}
     </div>
   );
 }

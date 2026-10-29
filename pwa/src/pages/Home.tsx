@@ -6,7 +6,6 @@ import { CreateTagSheet } from '../components/CreateTagSheet';
 import { MicButton } from '../components/MicButton';
 import { PromptsCard } from '../components/PromptsCard';
 import { QuickTagGrid } from '../components/QuickTagGrid';
-import { StressFAB } from '../components/StressFAB';
 import { TimeOffsetPicker, type TimeSelection } from '../components/TimeOffsetPicker';
 import { Toast } from '../components/Toast';
 import { VoiceReviewSheet } from '../components/VoiceReviewSheet';
@@ -191,7 +190,6 @@ export default function Home() {
           onRatingSkip={handleRatingSkip}
         />
       </div>
-      <StressFAB />
       <VoiceReviewSheet
         visible={voice.state === 'review' || voice.state === 'analyzing'}
         transcript={voice.editedTranscript}
