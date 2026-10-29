@@ -128,6 +128,7 @@ export function useVoiceCapture(): VoiceCaptureReturn {
 
     recognitionRef.current = recognition;
     recognition.start();
+    setState('recording');
   }, [stopDurationTimer]);
 
   const stopWithSpeechRecognition = useCallback(() => {

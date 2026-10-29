@@ -60,6 +60,12 @@ export default function Home() {
   const voice = useVoiceCapture();
 
   useEffect(() => {
+    if (voice.state !== 'error') return;
+    showToast(voice.error ?? 'Voice recording failed', { duration: 3000 });
+    voice.reset();
+  }, [voice.state]);
+
+  useEffect(() => {
     if (!child) return;
     const today = todayDateString();
     Promise.all([
