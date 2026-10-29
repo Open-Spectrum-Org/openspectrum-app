@@ -1,4 +1,4 @@
-import type { ObservationWithTags, FocusArea } from '../types/database';
+import type { ObservationWithTags } from '../types/database';
 
 export interface ExportMetadata {
   generatedAt: string;
@@ -136,27 +136,6 @@ export async function triggerDownload(
   // Tier 3: clipboard — last resort
   await navigator.clipboard.writeText(content);
   return 'clipboard';
-}
-
-export function filterByFocusAreas(
-  obs: ObservationWithTags[],
-  areas: FocusArea[],
-  selectedIds: string[]
-): ObservationWithTags[] {
-  if (selectedIds.length === 0) return obs;
-
-  const categorySet = new Set<string>();
-  for (const area of areas) {
-    if (!selectedIds.includes(area.id)) continue;
-    try {
-      const cats = area.related_categories ? (JSON.parse(area.related_categories) as string[]) : [];
-      for (const c of cats) categorySet.add(c);
-    } catch {
-      // malformed JSON — skip this area
-    }
-  }
-
-  return obs.filter((ob) => categorySet.has(ob.category));
 }
 
 export function buildFilename(

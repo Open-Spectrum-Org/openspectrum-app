@@ -3,7 +3,9 @@ import { AppHeader } from '../components/AppHeader';
 import { useChild } from '../hooks/useChild';
 import { useReportData } from '../hooks/useReportData';
 import { colors, categoryColor, categoryColorLight } from '../theme';
-import { todayDateString, addDays } from '../utils/date';
+import { todayDateString, addDays, nowISO } from '../utils/date';
+import { getObservationsByDateRange } from '../db/queries/observations';
+import { buildCSV, buildJSON, buildFilename, triggerDownload, type ExportMetadata } from '../utils/exportData';
 
 type RangeOption = '7' | '14' | '30';
 
@@ -40,6 +42,8 @@ function formatDateRange(start: string, end: string): string {
 export default function Reports() {
   const { child } = useChild();
   const [range, setRange] = useState<RangeOption>('7');
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [exportFeedback, setExportFeedback] = useState<string | null>(null);
 
   const today = todayDateString();
   const startDate = addDays(today, -parseInt(range) + 1);
@@ -83,6 +87,32 @@ export default function Reports() {
     } else {
       await navigator.clipboard.writeText(lines.join('\n'));
       alert('Report copied to clipboard');
+    }
+  };
+
+  const exportData = async (format: 'csv' | 'json') => {
+    if (!child) return;
+    setExportMenuOpen(false);
+    setExportFeedback(null);
+    try {
+      const obs = await getObservationsByDateRange(child.id, startDate, today);
+      const meta: ExportMetadata = {
+        generatedAt: nowISO(),
+        childName: child.display_name,
+        dateRange: { start: startDate, end: today },
+        focusAreas: [],
+        totalObservations: obs.length,
+        dataLayerNote:
+          'raw = directly logged; derived = system-inferred; ai_interpreted = AI transcription',
+      };
+      const content = format === 'csv' ? buildCSV(obs, meta) : buildJSON(obs, meta);
+      const filename = buildFilename(child.display_name, startDate, today, format);
+      const result = await triggerDownload(content, filename, format === 'csv' ? 'text/csv' : 'application/json');
+      if (result === 'clipboard') {
+        setExportFeedback(`Copied to clipboard — paste into a text file and save as .${format}`);
+      }
+    } catch {
+      setExportFeedback('Export failed. Please try again.');
     }
   };
 
@@ -221,13 +251,42 @@ export default function Reports() {
               </div>
             )}
 
-            {/* Share button */}
-            <button
-              onClick={shareReport}
-              className="w-full bg-primary rounded-[10px] py-3 text-center mt-2"
-            >
-              <span className="text-base font-semibold text-white">Share Report</span>
-            </button>
+            {/* Share + Export */}
+            <div className="relative flex gap-3 mt-2">
+              <button
+                onClick={shareReport}
+                className="flex-1 bg-primary rounded-[10px] py-3 text-center"
+              >
+                <span className="text-base font-semibold text-white">Share Report</span>
+              </button>
+              <button
+                onClick={() => setExportMenuOpen((o) => !o)}
+                className="flex-1 border border-primary bg-white rounded-[10px] py-3 text-center"
+              >
+                <span className="text-base font-semibold text-primary">Export Data ▾</span>
+              </button>
+              {exportMenuOpen && (
+                <div className="absolute right-0 bottom-full mb-2 w-[calc(50%-6px)] bg-white border border-border rounded-[10px] shadow-lg overflow-hidden">
+                  <button
+                    onClick={() => { void exportData('csv'); }}
+                    className="w-full px-4 py-3 text-left text-sm font-medium text-text-primary active:bg-surface"
+                  >
+                    Export CSV
+                  </button>
+                  <button
+                    onClick={() => { void exportData('json'); }}
+                    className="w-full px-4 py-3 text-left text-sm font-medium text-text-primary border-t border-border active:bg-surface"
+                  >
+                    Export JSON
+                  </button>
+                </div>
+              )}
+            </div>
+            {exportFeedback && (
+              <p className={`text-sm text-center ${exportFeedback.startsWith('Export failed') ? 'text-red-500' : 'text-text-muted'}`}>
+                {exportFeedback}
+              </p>
+            )}
           </>
         )}
       </div>
