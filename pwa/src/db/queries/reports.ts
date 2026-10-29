@@ -370,3 +370,45 @@ export async function getDayOfWeekPattern(
     count: counts.get(i) ?? 0,
   }));
 }
+
+export interface SleepDifficultyLink {
+  poorSleepDays: number;
+  poorSleepDifficult: number;
+  goodSleepDays: number;
+  goodSleepDifficult: number;
+}
+
+/** How often days with poor vs good sleep were rated difficult */
+export async function getSleepDifficultyLink(
+  childId: string,
+  startDate: string,
+  endDate: string
+): Promise<SleepDifficultyLink> {
+  const sleepObs = await db.observations
+    .where('[child_id+occurred_at]')
+    .between([childId, dayStartISO(startDate)], [childId, dayEndISO(endDate)], true, true)
+    .filter((o) => o.is_deleted === 0 && o.category === 'sleep')
+    .toArray();
+
+  const sleepByDate = new Map<string, 'poor' | 'good'>();
+  for (const o of sleepObs) {
+    const date = isoToLocalDate(o.occurred_at);
+    if (o.title === 'Poor Sleep') sleepByDate.set(date, 'poor');
+    else if (o.title === 'Slept Well' && !sleepByDate.has(date)) sleepByDate.set(date, 'good');
+  }
+
+  const reflections = await db.daily_reflections
+    .where('child_id')
+    .equals(childId)
+    .filter((r) => r.is_deleted === 0 && r.reflection_date >= startDate && r.reflection_date <= endDate)
+    .toArray();
+
+  const link: SleepDifficultyLink = { poorSleepDays: 0, poorSleepDifficult: 0, goodSleepDays: 0, goodSleepDifficult: 0 };
+  for (const r of reflections) {
+    const sleep = sleepByDate.get(r.reflection_date);
+    const difficult = r.rating === 'difficult' ? 1 : 0;
+    if (sleep === 'poor') { link.poorSleepDays++; link.poorSleepDifficult += difficult; }
+    if (sleep === 'good') { link.goodSleepDays++; link.goodSleepDifficult += difficult; }
+  }
+  return link;
+}

@@ -5,7 +5,6 @@ import { NavBar } from './components/NavBar';
 import Home from './pages/Home';
 import Timeline from './pages/Timeline';
 import FocusAreas from './pages/FocusAreas';
-import Insights from './pages/Insights';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import { SetupScreen } from './pages/SetupScreen';
@@ -26,7 +25,6 @@ function AppRoutes() {
           <Route path="/" element={<Home />} />
           <Route path="/timeline" element={<Timeline />} />
           <Route path="/focus" element={<FocusAreas />} />
-          <Route path="/insights" element={<Insights />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>

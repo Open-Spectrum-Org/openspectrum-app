@@ -31,6 +31,14 @@ interface HypothesisInput {
     count: number;
   }[];
   dailyCounts: { date: string; count: number }[];
+  reflections?: { rating: string; count: number }[];
+  priorReflections?: { rating: string; count: number }[];
+  sleepDifficulty?: {
+    poorSleepDays: number;
+    poorSleepDifficult: number;
+    goodSleepDays: number;
+    goodSleepDifficult: number;
+  };
 }
 
 /**
@@ -42,6 +50,38 @@ export function generateHypotheses(data: HypothesisInput): Hypothesis[] {
 
   const catMap = new Map(data.categoryBreakdown.map((c) => [c.category, c.count]));
   const priorTotal = data.priorCategoryBreakdown.reduce((s, c) => s + c.count, 0);
+
+  // 0. Poor sleep followed by difficult days
+  const sd = data.sleepDifficulty;
+  if (sd && sd.poorSleepDays >= 3 && sd.goodSleepDays >= 3) {
+    const poorRate = sd.poorSleepDifficult / sd.poorSleepDays;
+    const goodRate = sd.goodSleepDifficult / sd.goodSleepDays;
+    if (poorRate >= goodRate + 0.3) {
+      results.push({
+        id: 'sleep-difficulty',
+        icon: '😴',
+        text: `After poor sleep, ${sd.poorSleepDifficult} of ${sd.poorSleepDays} days were rated difficult, vs ${sd.goodSleepDifficult} of ${sd.goodSleepDays} after a good night. Sleep may be a key driver of hard days.`,
+      });
+    }
+  }
+
+  // 0b. Fewer difficult days than the previous period
+  const difficultNow = data.reflections?.find((r) => r.rating === 'difficult')?.count ?? 0;
+  const difficultBefore = data.priorReflections?.find((r) => r.rating === 'difficult')?.count ?? 0;
+  const hasPriorReflections = (data.priorReflections?.reduce((s, r) => s + r.count, 0) ?? 0) >= 5;
+  if (hasPriorReflections && difficultBefore >= 3 && difficultNow <= difficultBefore * 0.6) {
+    results.push({
+      id: 'fewer-difficult-days',
+      icon: '📉',
+      text: `Fewer difficult days: ${difficultNow} this period vs ${difficultBefore} in the previous period. Something that changed recently may be helping.`,
+    });
+  } else if (hasPriorReflections && difficultNow >= 3 && difficultNow >= Math.max(difficultBefore, 1) * 1.6) {
+    results.push({
+      id: 'more-difficult-days',
+      icon: '⚠️',
+      text: `More difficult days: ${difficultNow} this period vs ${difficultBefore} in the previous period. Worth looking at what changed.`,
+    });
+  }
 
   // 1. Activity spike / drop vs prior period
   if (priorTotal >= 3 && data.totalCount > 0) {
@@ -99,6 +139,12 @@ export function generateHypotheses(data: HypothesisInput): Hypothesis[] {
         id: 'morning-peak',
         icon: '🌅',
         text: 'Most observations occur in the morning hours. Morning routines may be a particularly eventful or challenging time.',
+      });
+    } else if (afternoon > morning * 1.2 && afternoon > evening * 1.5) {
+      results.push({
+        id: 'afternoon-peak',
+        icon: '🏫',
+        text: 'Afternoons (12–6pm) are the busiest time. After-school transitions may be a key moment to plan for.',
       });
     } else if (evening > morning * 1.5 && evening > afternoon * 1.2) {
       results.push({

@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
 import { AppHeader } from '../components/AppHeader';
 import { useChild } from '../hooks/useChild';
+import { useFocusAreas } from '../hooks/useFocusAreas';
 import { useReportData } from '../hooks/useReportData';
 import { colors, categoryColor, categoryColorLight } from '../theme';
 import { todayDateString, addDays, nowISO } from '../utils/date';
+import { generateHypotheses } from '../utils/insights';
 import { getObservationsByDateRange } from '../db/queries/observations';
 import { buildCSV, buildJSON, buildFilename, triggerDownload, type ExportMetadata } from '../utils/exportData';
 
@@ -27,6 +29,19 @@ const CATEGORY_EMOJIS: Record<string, string> = {
   trigger: '⚠️', other: '📝',
 };
 
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function hourLabel(h: number): string {
+  if (h === 0) return '12a';
+  if (h < 12) return `${h}a`;
+  if (h === 12) return '12p';
+  return `${h - 12}p`;
+}
+
+function parseCats(json: string | null): string[] {
+  try { return json ? (JSON.parse(json) as string[]) : []; } catch { return []; }
+}
+
 function formatDateShort(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00');
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
@@ -39,15 +54,30 @@ function formatDateRange(start: string, end: string): string {
   return `${s.toLocaleDateString([], opts)} – ${e.toLocaleDateString([], opts)}`;
 }
 
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <h2 className="text-xl font-bold text-text-primary pt-4 border-t border-border">{children}</h2>;
+}
+
 export default function Reports() {
   const { child } = useChild();
+  const { areas } = useFocusAreas();
   const [range, setRange] = useState<RangeOption>('7');
+  const [focusAreaId, setFocusAreaId] = useState<string | null>(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [exportFeedback, setExportFeedback] = useState<string | null>(null);
 
   const today = todayDateString();
-  const startDate = addDays(today, -parseInt(range) + 1);
-  const { data, loading } = useReportData(startDate, today);
+  const periodDays = parseInt(range);
+  const startDate = addDays(today, -periodDays + 1);
+
+  const activeFocusAreas = useMemo(() => areas.filter((a) => a.status === 'active'), [areas]);
+  const selectedFocusArea = areas.find((a) => a.id === focusAreaId) ?? null;
+  const categories = useMemo(() => {
+    const cats = selectedFocusArea ? parseCats(selectedFocusArea.related_categories) : [];
+    return cats.length ? cats : undefined;
+  }, [selectedFocusArea?.id, selectedFocusArea?.related_categories]);
+
+  const { data, loading } = useReportData(startDate, today, periodDays, categories);
 
   const maxCategory = useMemo(() => {
     if (!data?.categoryBreakdown.length) return 0;
@@ -59,12 +89,41 @@ export default function Reports() {
     return Math.max(...data.dailyCounts.map((d) => d.count));
   }, [data]);
 
+  const maxHourly = useMemo(() => {
+    if (!data?.hourlyDistribution.length) return 0;
+    return Math.max(...data.hourlyDistribution.map((h) => h.count));
+  }, [data]);
+
+  const maxDayOfWeek = useMemo(() => {
+    if (!data?.dayOfWeekPattern.length) return 0;
+    return Math.max(...data.dayOfWeekPattern.map((d) => d.count));
+  }, [data]);
+
+  const peakHour = useMemo(() => {
+    if (!data?.hourlyDistribution.length) return null;
+    return data.hourlyDistribution.reduce((best, cur) => (cur.count > best.count ? cur : best));
+  }, [data]);
+
+  // % change vs the previous period of the same length (hidden when there's no prior data)
+  const periodChangePct = useMemo(() => {
+    if (!data) return null;
+    const priorTotal = data.priorCategoryBreakdown.reduce((s, c) => s + c.count, 0);
+    if (priorTotal === 0) return null;
+    return Math.round(((data.totalCount - priorTotal) / priorTotal) * 100);
+  }, [data]);
+
+  const hypotheses = useMemo(() => (data ? generateHypotheses(data) : []), [data]);
+
   const shareReport = async () => {
     if (!data || !child) return;
     const lines = [
       `OpenSpectrum Report — ${child.display_name}`,
       `Period: ${formatDateRange(startDate, today)}`,
+      ...(selectedFocusArea ? [`Focus area: ${selectedFocusArea.title}`] : []),
       `Total Observations: ${data.totalCount}`,
+      '',
+      '--- Insights ---',
+      ...hypotheses.map((h) => `${h.icon} ${h.text}`),
       '',
       '--- Category Breakdown ---',
       ...data.categoryBreakdown.map(
@@ -95,12 +154,15 @@ export default function Reports() {
     setExportMenuOpen(false);
     setExportFeedback(null);
     try {
-      const obs = await getObservationsByDateRange(child.id, startDate, today);
+      const all = await getObservationsByDateRange(child.id, startDate, today);
+      const obs = categories ? all.filter((o) => categories.includes(o.category)) : all;
       const meta: ExportMetadata = {
         generatedAt: nowISO(),
         childName: child.display_name,
         dateRange: { start: startDate, end: today },
-        focusAreas: [],
+        focusAreas: selectedFocusArea
+          ? [{ id: selectedFocusArea.id, title: selectedFocusArea.title, categories: categories ?? [] }]
+          : [],
         totalObservations: obs.length,
         dataLayerNote:
           'raw = directly logged; derived = system-inferred; ai_interpreted = AI transcription',
@@ -116,9 +178,14 @@ export default function Reports() {
     }
   };
 
+  const chipClass = (active: boolean) =>
+    `px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+      active ? 'bg-primary text-white border-primary' : 'border-border text-text-secondary bg-surface'
+    }`;
+
   return (
     <div className="flex flex-col h-full bg-white">
-      <AppHeader searchQuery="" onSearchChange={() => {}} placeholder="Search coming soon" showHome={true} editable={false} />
+      <AppHeader searchQuery="" onSearchChange={() => {}} showHome={true} editable={false} />
       <div className="flex-1 overflow-y-auto p-4 pb-12 space-y-4">
         {/* Range selector */}
         <div className="flex gap-2">
@@ -137,6 +204,20 @@ export default function Reports() {
           ))}
         </div>
 
+        {/* Focus area filter */}
+        {activeFocusAreas.length > 0 && (
+          <div className="flex gap-2 flex-wrap">
+            <button onClick={() => setFocusAreaId(null)} className={chipClass(focusAreaId === null)}>
+              All data
+            </button>
+            {activeFocusAreas.map((area) => (
+              <button key={area.id} onClick={() => setFocusAreaId(area.id)} className={chipClass(focusAreaId === area.id)}>
+                🎯 {area.title}
+              </button>
+            ))}
+          </div>
+        )}
+
         <p className="text-sm text-text-muted text-center">{formatDateRange(startDate, today)}</p>
 
         {loading ? (
@@ -151,13 +232,17 @@ export default function Reports() {
           </div>
         ) : (
           <>
-            {/* Total count card */}
+            {/* ── Summary ─────────────────────────────────────────── */}
             <div className="bg-primary-light rounded-2xl p-6 text-center">
               <div className="text-[40px] font-bold text-primary">{data.totalCount}</div>
               <div className="text-base text-primary">Total Observations</div>
+              {periodChangePct !== null && (
+                <div className="text-xs text-text-secondary mt-1">
+                  {periodChangePct >= 0 ? '▲' : '▼'} {Math.abs(periodChangePct)}% vs previous {periodDays} days
+                </div>
+              )}
             </div>
 
-            {/* Category breakdown */}
             <div>
               <h3 className="text-lg font-semibold text-text-primary mb-3">By Category</h3>
               {data.categoryBreakdown.map((cat) => (
@@ -181,26 +266,27 @@ export default function Reports() {
               ))}
             </div>
 
-            {/* Daily log chart */}
             <div>
               <h3 className="text-lg font-semibold text-text-primary mb-3">Daily Activity</h3>
               <div className="flex items-end gap-0.5 h-[120px] pt-5">
-                {data.dailyCounts.map((day) => (
-                  <div key={day.date} className="flex-1 flex flex-col items-center justify-end">
-                    <span className="text-xs text-text-muted mb-0.5">{day.count}</span>
-                    <div
-                      className="w-[70%] rounded-sm bg-primary"
-                      style={{ height: maxDaily > 0 ? Math.max((day.count / maxDaily) * 80, 4) : 4 }}
-                    />
-                    <span className="text-[10px] text-text-muted mt-0.5">
-                      {formatDateShort(day.date).split(' ')[1]}
-                    </span>
-                  </div>
-                ))}
+                {data.dailyCounts.map((day, i) => {
+                  const showLabels = data.dailyCounts.length <= 14;
+                  return (
+                    <div key={day.date} className="flex-1 flex flex-col items-center justify-end">
+                      {showLabels && <span className="text-xs text-text-muted mb-0.5">{day.count}</span>}
+                      <div
+                        className="w-[70%] rounded-sm bg-primary"
+                        style={{ height: maxDaily > 0 ? Math.max((day.count / maxDaily) * 80, 4) : 4 }}
+                      />
+                      <span className="text-[10px] text-text-muted mt-0.5 h-3">
+                        {showLabels || i % 5 === 0 ? formatDateShort(day.date).split(' ')[1] : ''}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Top tags */}
             {data.topTags.length > 0 && (
               <div>
                 <h3 className="text-lg font-semibold text-text-primary mb-3">Top Tags</h3>
@@ -226,7 +312,6 @@ export default function Reports() {
               </div>
             )}
 
-            {/* Reflections */}
             {data.reflections.length > 0 && (
               <div>
                 <h3 className="text-lg font-semibold text-text-primary mb-3">Daily Reflections</h3>
@@ -251,8 +336,121 @@ export default function Reports() {
               </div>
             )}
 
+            {/* ── Insights ────────────────────────────────────────── */}
+            {(hypotheses.length > 0 || data.assessmentAverages.length > 0) && (
+              <>
+                <SectionTitle>Insights</SectionTitle>
+                {hypotheses.length > 0 && (
+                  <div className="space-y-3">
+                    {hypotheses.map((h) => (
+                      <div key={h.id} className="flex bg-surface rounded-[10px] p-4 border border-border gap-3">
+                        <span className="text-[24px] leading-none mt-0.5">{h.icon}</span>
+                        <p className="flex-1 text-sm text-text-secondary leading-5">{h.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {data.assessmentAverages.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-text-primary mb-3">Assessment Scores</h3>
+                    <div className="space-y-2">
+                      {data.assessmentAverages.map((a) => (
+                        <div key={a.scaleId} className="bg-surface rounded-[10px] p-4 border border-border">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-semibold text-text-primary">{a.scaleName}</span>
+                            <span className="text-xs text-text-muted">{a.count} ratings</span>
+                          </div>
+                          {a.scaleType === 'numeric' && a.avg !== null && a.maxValue !== null ? (
+                            <>
+                              <div className="flex items-baseline gap-1 mb-1">
+                                <span className="text-[22px] font-semibold text-primary">{a.avg}</span>
+                                <span className="text-sm text-text-muted">/ {a.maxValue}</span>
+                              </div>
+                              <div className="h-2 bg-border rounded-full overflow-hidden">
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{ width: `${(a.avg / a.maxValue) * 100}%`, backgroundColor: colors.primary }}
+                                />
+                              </div>
+                            </>
+                          ) : (
+                            <div className="flex flex-wrap gap-2">
+                              {Object.entries(a.distribution)
+                                .sort((x, y) => y[1] - x[1])
+                                .map(([val, cnt]) => (
+                                  <span
+                                    key={val}
+                                    className="px-2 py-0.5 bg-white border border-border rounded-full text-xs text-text-secondary"
+                                  >
+                                    {val.replace('_', ' ')}: {cnt}
+                                  </span>
+                                ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ── Patterns ────────────────────────────────────────── */}
+            <SectionTitle>Patterns</SectionTitle>
+
+            {data.hourlyDistribution.length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold text-text-primary mb-1">Time of Day</h3>
+                {peakHour && (
+                  <p className="text-sm text-text-secondary mb-3">
+                    Busiest around {hourLabel(peakHour.hour)} ({peakHour.count} entries)
+                  </p>
+                )}
+                <div className="flex items-end h-[90px] gap-px">
+                  {Array.from({ length: 18 }, (_, i) => i + 6).map((hour) => {
+                    const count = data.hourlyDistribution.find((h) => h.hour === hour)?.count ?? 0;
+                    return (
+                      <div key={hour} className="flex-1 flex flex-col items-center justify-end">
+                        <div
+                          className="w-4/5 rounded-sm"
+                          style={{
+                            height: maxHourly > 0 ? Math.max((count / maxHourly) * 60, count > 0 ? 2 : 0) : 0,
+                            backgroundColor: peakHour && hour === peakHour.hour ? colors.primary : colors.primaryLight,
+                          }}
+                        />
+                        <span className="text-[9px] text-text-muted mt-0.5 h-3">
+                          {hour % 3 === 0 ? hourLabel(hour) : ''}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {data.dayOfWeekPattern.some((d) => d.count > 0) && (
+              <div>
+                <h3 className="text-lg font-semibold text-text-primary mb-3">Day of Week</h3>
+                <div className="flex items-end h-[80px] gap-1">
+                  {data.dayOfWeekPattern.map((d) => (
+                    <div key={d.dayIndex} className="flex-1 flex flex-col items-center justify-end">
+                      <div
+                        className="w-full rounded-sm"
+                        style={{
+                          height: maxDayOfWeek > 0 ? Math.max((d.count / maxDayOfWeek) * 52, d.count > 0 ? 2 : 0) : 0,
+                          backgroundColor: colors.primaryLight,
+                        }}
+                      />
+                      <span className="text-[9px] text-text-muted mt-1">{DAY_LABELS[d.dayIndex]}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Share + Export */}
-            <div className="relative flex gap-3 mt-2">
+            <div className="relative flex gap-3 pt-2">
               <button
                 onClick={shareReport}
                 className="flex-1 bg-primary rounded-[10px] py-3 text-center"
